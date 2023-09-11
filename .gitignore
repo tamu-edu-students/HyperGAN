@@ -1,0 +1,7 @@
+# Ignore compiled Python files 
+Dataset/
+# Ignore log files
+*.log
+
+# Ignore temporary files
+*.tmp
