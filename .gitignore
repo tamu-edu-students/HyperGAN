@@ -1,5 +1,6 @@
 # Ignore compiled Python files 
-Dataset/
+dataset/
+hyperimages/
 # Ignore log files
 *.log
 
