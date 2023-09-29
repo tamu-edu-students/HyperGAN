@@ -28,6 +28,7 @@ class BaseModel(ABC):
             -- self.optimizers (optimizer list):    define and initialize optimizers. You can define one optimizer for each network. If two networks are updated at the same time, you can use itertools.chain to group them. See cycle_gan_model.py for an example.
         """
         self.opt = opt
+        self.gpu_ids = opt.gpu_ids
         self.isTrain = opt.isTrain
         self.device = tf.config.list_physical_devices('GPU') if self.gpu_ids else tf.config.list_physical_devices('CPU')  # get device name: CPU or GPU
         self.save_dir = os.path.join(opt.checkpoints_dir, opt.name)  # save all the checkpoints to save_dir

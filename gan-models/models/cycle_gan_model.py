@@ -22,6 +22,8 @@ class CycleGANModel(BaseModel):
     def __init__(self, opt):
         BaseModel.__init__(self, opt)
         self.loss_names = ['D_A', 'G_A', 'cycle_A', 'idt_A', 'D_B', 'G_B', 'cycle_B', 'idt_B']
+        self.set_input(opt)
+        self.create_networks(opt)
 
     def create_networks(self, opt):
         
@@ -45,6 +47,8 @@ class CycleGANModel(BaseModel):
             self.model_names = ['G_A2B', 'G_B2A']
             self.G_A2B = networks.ResnetGenerator(input_shape=(opt.crop_size, opt.crop_size, 3))
             self.G_B2A = networks.ResnetGenerator(input_shape=(opt.crop_size, opt.crop_size, 3))
+        
+        print('networks created: ', self.model_names)
 
     @staticmethod
     def modify_commandline_options(parser, is_train=True):
@@ -80,17 +84,19 @@ class CycleGANModel(BaseModel):
         Parameters:
             input: a dictionary that contains the data itself and its metadata information.
         """
-        self.A_img_paths = py.glob(py.join(opt.datasets_dir, opt.dataset, 'trainA'), '*.jpg')
-        self.B_img_paths = py.glob(py.join(opt.datasets_dir, opt.dataset, 'trainB'), '*.jpg')
+        self.A_img_paths = py.glob(py.join(opt.datasets_dir, opt.dataroot, 'trainA'), '*.jpg')
+        self.B_img_paths = py.glob(py.join(opt.datasets_dir, opt.dataroot, 'trainB'), '*.jpg')
         self.A_B_dataset, self.len_dataset = dops.make_zip_dataset(self.A_img_paths, self.B_img_paths, opt.batch_size, opt.load_size, opt.crop_size, training=True, repeat=False)
 
         self.A2B_pool = dops.ItemPool(opt.pool_size)
         self.B2A_pool = dops.ItemPool(opt.pool_size)
 
-        self.A_img_paths_test = py.glob(py.join(opt.datasets_dir, opt.dataset, 'testA'), '*.jpg')
-        self.B_img_paths_test = py.glob(py.join(opt.datasets_dir, opt.dataset, 'testB'), '*.jpg')
+        self.A_img_paths_test = py.glob(py.join(opt.datasets_dir, opt.dataroot, 'testA'), '*.jpg')
+        self.B_img_paths_test = py.glob(py.join(opt.datasets_dir, opt.dataroot, 'testB'), '*.jpg')
         self.A_B_dataset_test, _ = dops.make_zip_dataset(self.A_img_paths_test, self.B_img_paths_test, opt.batch_size, opt.load_size, opt.crop_size, training=False, repeat=True)
 
+        self.output_dir = py.join('output', opt.dataroot)
+        py.mkdir(self.output_dir)
 
     def forward(self, A, B):
         """Run forward pass. This will be called by both functions <optimize_parameters> and <test>."""
@@ -100,12 +106,21 @@ class CycleGANModel(BaseModel):
         self.B2A2B = self.G_A2B(self.B2A, training=self.isTrain)
         self.A2A = self.G_B2A(A, training=self.isTrain)
         self.B2B = self.G_A2B(B, training=self.isTrain)
-
+    
+    @tf.function
     def backward_G(self, A, B, opt):
         """Calculate losses, gradients, and update network weights; called in every training iteration"""
         # caculate the intermediate results if necessary; here self.output has been computed during function <forward>
         # calculate loss given the input and intermediate results
         with tf.GradientTape() as t:
+
+            self.A2B = self.G_A2B(A, training=self.isTrain)
+            self.B2A = self.G_B2A(B, training=self.isTrain)
+            self.A2B2A = self.G_B2A(self.A2B, training=self.isTrain)
+            self.B2A2B = self.G_A2B(self.B2A, training=self.isTrain)
+            self.A2A = self.G_B2A(A, training=self.isTrain)
+            self.B2B = self.G_A2B(B, training=self.isTrain)
+
             A2B_d_logits = self.D_B(self.A2B, training=True)
             B2A_d_logits = self.D_A(self.B2A, training=True)
 
@@ -127,7 +142,7 @@ class CycleGANModel(BaseModel):
                       'B2A2B_cycle_loss': B2A2B_cycle_loss,
                       'A2A_id_loss': A2A_id_loss,
                       'B2B_id_loss': B2B_id_loss}
-
+    @tf.function
     def backward_D(self, A, B, opt):
         with tf.GradientTape() as t:    
             A_d_logits = self.D_A(A, training=True)
@@ -153,7 +168,7 @@ class CycleGANModel(BaseModel):
     def optimize_parameters(self, A, B, opt):
         """Update network weights; it will be called in every training iteration."""
 
-        self.forward()               # first call forward to calculate intermediate results
+        # self.forward(A, B)               # first call forward to calculate intermediate results
         
         G_loss_dict = self.backward_G(A, B, opt)
         
@@ -164,7 +179,7 @@ class CycleGANModel(BaseModel):
 
         return G_loss_dict, D_loss_dict
         
-
+    @tf.function
     def sample(self, A, B):
         
         self.A2B = self.G_A2B(A, training=False)

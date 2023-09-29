@@ -1,55 +1,65 @@
 import argparse
 import os
 from util import util
-
+import models
 
 class BaseOptions():
 
     def __init__(self) -> None:
         self.initialized = False
         self.arg_options = None
-        self.parser = None
+        
     
-    def initialize(self):
+    def initialize(self, parser):
 
-        self.parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        
 
-        self.parser.add_argument('--dataroot', required=True, help='path to images (should have subfolders trainA, trainB, valA, valB, etc)')
-        self.parser.add_argument('--name', type=str, default='experiment_name', help='name of the experiment. It decides where to store samples and models')
-        self.parser.add_argument('--model', type=str, default='cycle_gan', help='chooses which model to use. [cycle_gan | etc]')
-        self.parser.add_argument('--epochs', type=int, default=200)
-        self.parser.add_argument('--epoch_decay', type=int, default=100, help='epoch to start decaying learning rate')
-        self.parser.add_argument('--lr', type=float, default=0.0002, help='adam: learning rate')
-        self.parser.add_argument('--beta_1', type=float, default=0.5, help='adam: decay of first order momentum of gradient')
-        self.parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints', help='models are saved here')
-        self.parser.add_argument('--checkpoint_interval', type=int, default=10, help='interval between saving model checkpoints')
-        self.parser.add_argument('--adversarial_loss_mode', default='lsgan', choices=['gan', 'hinge_v1', 'hinge_v2', 'lsgan', 'wgan'])
-        self.parser.add_argument('--gradient_penalty_mode', default='none', choices=['none', 'dragan', 'wgan-gp'])
-        self.parser.add_argument('--gradient_penalty_weight', type=float, default=10.0)
-        self.parser.add_argument('--cycle_loss_weight', type=float, default=10.0)
-        self.parser.add_argument('--identity_loss_weight', type=float, default=0.0)
-        self.parser.add_argument('--pool_size', type=int, default=50)  # pool size to store fake samples
+        parser.add_argument('--dataroot', required=True, help='path to images (should have subfolders trainA, trainB, valA, valB, etc)')
+        parser.add_argument('--datasets_dir', default='datasets')
+        parser.add_argument('--name', type=str, default='experiment_name', help='name of the experiment. It decides where to store samples and models')
+        parser.add_argument('--model', type=str, default='cycle_gan', help='chooses which model to use. [cycle_gan | etc]')
+        parser.add_argument('--suffix', default='', type=str, help='customized suffix: opt.name = opt.name + suffix: e.g., {model}_{netG}_size{load_size}')
+        parser.add_argument('--gpu_ids', type=str, default='', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
+        parser.add_argument('--epochs', type=int, default=200)
+        parser.add_argument('--epoch_decay', type=int, default=100, help='epoch to start decaying learning rate')
+        parser.add_argument('--lr', type=float, default=0.0002, help='adam: learning rate')
+        parser.add_argument('--beta_1', type=float, default=0.5, help='adam: decay of first order momentum of gradient')
+        parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints', help='models are saved here')
+        parser.add_argument('--checkpoint_interval', type=int, default=10, help='interval between saving model checkpoints')
+        parser.add_argument('--load_size', type=int, default=286, help='scale images to this size')
+        parser.add_argument('--crop_size', type=int, default=256, help='then crop to this size')
+        parser.add_argument('--batch_size', type=int, default=1)
+        parser.add_argument('--adversarial_loss_mode', default='lsgan', choices=['gan', 'hinge_v1', 'hinge_v2', 'lsgan', 'wgan'])
+        parser.add_argument('--gradient_penalty_mode', default='none', choices=['none', 'dragan', 'wgan-gp'])
+        parser.add_argument('--gradient_penalty_weight', type=float, default=10.0)
+        parser.add_argument('--cycle_loss_weight', type=float, default=10.0)
+        parser.add_argument('--identity_loss_weight', type=float, default=0.0)
+        parser.add_argument('--pool_size', type=int, default=50)  # pool size to store fake samples
 
         self.initialized = True
+        return parser
 
     def gather_options(self):
 
         if not self.initialized:
-            self.initialize()
+            parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+            parser = self.initialize(parser)
 
-        opt = self.parser.parse_known_args()
+        opt, _ = parser.parse_known_args()
+        
+
         model_name = opt.model
-
-        #model_option_setter = models.get_option_setter(model_name)
-
+        model_option_setter = models.get_option_setter(model_name)
+        parser = model_option_setter(parser, self.isTrain)
         # modify dataset-related parser options
-        dataset_name = opt.dataset_mode
+       # dataset_name = opt.dataset_mode
         #dataset_option_setter = data.get_option_setter(dataset_name)
         #parser = dataset_option_setter(parser, self.isTrain)
 
         # save and return the parser
-        return self.parser.parse_args()
-    
+        self.parser = parser
+        return parser.parse_args()
+
     
     def print_options(self, opt):
         """Print and save options
@@ -98,6 +108,6 @@ class BaseOptions():
         # if len(opt.gpu_ids) > 0:
         #     torch.cuda.set_device(opt.gpu_ids[0])
 
-        # self.opt = opt
+        self.opt = opt
         return self.opt
     

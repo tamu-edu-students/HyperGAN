@@ -16,10 +16,17 @@
 import sys
 import tensorflow as tf
 import numpy as np
+import pylib as py
+# print(f"Tensor Flow Version: {tf.__version__}")
+# print(f"Keras Version: {tf.keras.__version__}")
+# print()
+# print(f"Python {sys.version}")
+# gpu = len(tf.config.list_physical_devices('GPU'))>0
+# print("GPU is", "available" if gpu else "NOT AVAILABLE")
 
-print(f"Tensor Flow Version: {tf.__version__}")
-print(f"Keras Version: {tf.keras.__version__}")
-print()
-print(f"Python {sys.version}")
-gpu = len(tf.config.list_physical_devices('GPU'))>0
-print("GPU is", "available" if gpu else "NOT AVAILABLE")
+output_dir = py.join('output', 'summer2winter')
+
+b = py.glob(py.join('datasets', 'summer2winter', 'trainA'), '*.jpg')
+
+print(output_dir)
+print(b)
