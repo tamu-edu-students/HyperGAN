@@ -74,3 +74,7 @@ class BaseModel(ABC):
     def optimize_parameters(self):
         """Calculate losses, gradients, and update network weights; called in every training iteration"""
         pass
+
+class BaseTrainer(ABC):
+
+    None

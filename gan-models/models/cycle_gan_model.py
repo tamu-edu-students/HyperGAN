@@ -1,11 +1,12 @@
 import itertools
-from .base_model import BaseModel
+from .base_model import BaseModel, BaseTrainer
 from . import networks
 import tensorflow as tf
 import tensorflow.keras as keras
 import pylib as py
 import data_ops as dops
 import functools
+
 
 class CycleGANModel(BaseModel):
     """
@@ -164,7 +165,8 @@ class CycleGANModel(BaseModel):
             'B_d_loss': B_d_loss + A2B_d_loss,
             'D_A_gp': D_A_gp,
             'D_B_gp': D_B_gp}
-
+    
+    @tf.function
     def optimize_parameters(self, A, B, opt):
         """Update network weights; it will be called in every training iteration."""
 
@@ -188,3 +190,17 @@ class CycleGANModel(BaseModel):
         self.B2A2B = self.G_A2B(self.B2A, training=False)
 
         return self
+    
+class Trainer(BaseTrainer):
+
+    def __init__():
+        pass
+
+    def forward(self, A, B):
+        """Run forward pass. This will be called by both functions <optimize_parameters> and <test>."""
+        self.A2B = self.G_A2B(A, training=self.isTrain)
+        self.B2A = self.G_B2A(B, training=self.isTrain)
+        self.A2B2A = self.G_B2A(self.A2B, training=self.isTrain)
+        self.B2A2B = self.G_A2B(self.B2A, training=self.isTrain)
+        self.A2A = self.G_B2A(A, training=self.isTrain)
+        self.B2B = self.G_A2B(B, training=self.isTrain) 
