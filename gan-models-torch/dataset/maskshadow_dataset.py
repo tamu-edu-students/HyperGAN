@@ -7,12 +7,12 @@ from PIL import Image
 import torchvision.transforms as transforms
 
 class MaskImageDataset(BaseImageDataset):
-    def __init__(self, root, transforms_=None, unaligned=False, mode='train'):
+    def __init__(self, dir, dataroot, transforms_=None, unaligned=False, mode='train'):
         self.transform = transforms.Compose(transforms_)
         self.unaligned = unaligned
 
-        self.files_A = sorted(glob.glob(os.path.join(root, 'shadow_train') + '/*.*'))
-        self.files_B = sorted(glob.glob(os.path.join(root, 'shadow_free') + '/*.*'))
+        self.files_A = sorted(glob.glob(os.path.join(dir, dataroot, 'trainA') + '/*.*'))
+        self.files_B = sorted(glob.glob(os.path.join(dir, dataroot, 'trainB') + '/*.*'))
 
     def __getitem__(self, index):
         item_A = self.transform(Image.open(self.files_A[index % len(self.files_A)]))

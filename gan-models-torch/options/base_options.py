@@ -12,16 +12,17 @@ class BaseOptions():
     
     def initialize(self, parser):
 
-        
-
         parser.add_argument('--dataroot', required=True, help='path to images (should have subfolders trainA, trainB, valA, valB, etc)')
         parser.add_argument('--datasets_dir', default='datasets')
         parser.add_argument('--name', type=str, default='experiment_name', help='name of the experiment. It decides where to store samples and models')
         parser.add_argument('--model', type=str, default='cycle_gan', help='chooses which model to use. [cycle_gan | etc]')
         parser.add_argument('--suffix', default='', type=str, help='customized suffix: opt.name = opt.name + suffix: e.g., {model}_{netG}_size{load_size}')
-        parser.add_argument('--gpu_ids', type=str, default='', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
+        parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
+        parser.add_argument('--cuda', action='store_true', help='use GPU computation')
         parser.add_argument('--epochs', type=int, default=200)
         parser.add_argument('--epoch_decay', type=int, default=100, help='epoch to start decaying learning rate')
+        parser.add_argument('--input_nc', type=int, default=3, help='number of channels of input data')
+        parser.add_argument('--output_nc', type=int, default=3, help='number of channels of output data')
         parser.add_argument('--lr', type=float, default=0.0002, help='adam: learning rate')
         parser.add_argument('--beta_1', type=float, default=0.5, help='adam: decay of first order momentum of gradient')
         parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints', help='models are saved here')
@@ -34,8 +35,8 @@ class BaseOptions():
         parser.add_argument('--gradient_penalty_weight', type=float, default=10.0)
         parser.add_argument('--cycle_loss_weight', type=float, default=10.0)
         parser.add_argument('--identity_loss_weight', type=float, default=0.0)
+        parser.add_argument('--n_cpu', type=int, default=8, help='number of cpu threads to use during batch generation')
         parser.add_argument('--pool_size', type=int, default=50)  # pool size to store fake samples
-        parser.add_argument('--restore', action='store_true', help='resume')  # pool size to store fake samples
 
         self.initialized = True
         return parser

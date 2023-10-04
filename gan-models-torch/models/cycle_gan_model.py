@@ -1,5 +1,5 @@
 import itertools
-from .base_model import BaseModel, BaseTrainer
+from .base_model import BaseModel
 from . import networks
 import torch
 import torchvision.transforms as transforms
@@ -25,43 +25,53 @@ class CycleGANModel(BaseModel):
 
     def __init__(self, opt):
         BaseModel.__init__(self, opt)
-        self.loss_names = ['D_A', 'G_A', 'cycle_A', 'idt_A', 'D_B', 'G_B', 'cycle_B', 'idt_B']
-
+        self.loss_names = ['D_A', 'G_A2B', 'cycle_ABA', 'idt_A', 'D_B', 'G_B2A', 'cycle_BAB', 'idt_B']
         self.create_networks(opt)
+
 
     def create_networks(self, opt):
         
         if self.isTrain:
             self.model_names = ['G_A2B', 'G_B2A', 'D_A', 'D_B']
-            self.G_A2B = networks.Generator_S2F(opt.input_nc, opt.output_nc)
-            self.G_B2A = networks.Generator_F2S(opt.output_nc, opt.input_nc)
+            print("ummmmmm")
+            self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc)
+            self.G_B2A = networks.Generator(opt.output_nc, opt.input_nc)
             self.D_A = networks.Discriminator(opt.input_nc)
             self.D_B = networks.Discriminator(opt.output_nc)
 
-            self.netG_A2B.apply(weights_init_normal)
-            self.netG_B2A.apply(weights_init_normal)
-            self.netD_A.apply(weights_init_normal)
-            self.netD_B.apply(weights_init_normal)
+            if opt.cuda:
+                print("will use GPU")
+                self.G_A2B.cuda()
+                self.G_B2A.cuda()
+                self.D_A.cuda()
+                self.D_B.cuda()
+            
+            self.G_A2B.apply(weights_init_normal)
+            self.G_B2A.apply(weights_init_normal)
+            self.D_A.apply(weights_init_normal)
+            self.D_B.apply(weights_init_normal)
 
             
-            self.criterionGAN = torch.nn.MSELoss  # define GAN loss.
+            self.criterionGAN = torch.nn.MSELoss()  # define GAN loss.
             self.criterionCycle = torch.nn.L1Loss()
             self.criterionIdentity = torch.nn.L1Loss()
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
-            self.optimizer_G = torch.optim.Adam(itertools.chain(self.G_A2B.parameters(), self.G_B2A.parameters()), lr=opt.lr, betas=(opt.beta1, 0.999))
+            self.optimizer_G = torch.optim.Adam(itertools.chain(self.G_A2B.parameters(), self.G_B2A.parameters()), lr=opt.lr, betas=(opt.beta_1, 0.999))
             self.optimizer_D_A = torch.optim.Adam(self.D_A.parameters(), lr=opt.lr, betas=(0.5, 0.999))
             self.optimizer_D_B = torch.optim.Adam(self.D_B.parameters(), lr=opt.lr, betas=(0.5, 0.999))
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D_A)
             self.optimizers.append(self.optimizer_D_B)
-
             self.lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(self.optimizer_G,
-												   lr_lambda=LambdaLR(opt.n_epochs, opt.epoch, opt.decay_epoch).step)
+												   lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step)
             self.lr_scheduler_D_A = torch.optim.lr_scheduler.LambdaLR(self.optimizer_D_A,
-													 lr_lambda=LambdaLR(opt.n_epochs, opt.epoch, opt.decay_epoch).step)
+													 lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step)
             self.lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(self.optimizer_D_B,
-													 lr_lambda=LambdaLR(opt.n_epochs, opt.epoch, opt.decay_epoch).step)
-
+													 lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step)
+            self.lrs.append(self.lr_scheduler_G)
+            self.lrs.append(self.lr_scheduler_D_A)
+            self.lrs.append(self.lr_scheduler_D_B)
+            
         else:  # during test time, only load Gs
             self.model_names = ['G_A2B', 'G_B2A']
             self.G_A2B = networks.Generator_S2F(opt.input_nc, opt.output_nc)
@@ -70,21 +80,12 @@ class CycleGANModel(BaseModel):
             self.netG_B2A.apply(weights_init_normal)
         
         Tensor = torch.cuda.FloatTensor if opt.cuda else torch.Tensor
-        self.input_A = Tensor(opt.batchSize, opt.input_nc, opt.size, opt.size)
-        self.input_B = Tensor(opt.batchSize, opt.output_nc, opt.size, opt.size)
-        self.target_real = torch.autograd.Variable(Tensor(opt.batchSize).fill_(1.0), requires_grad=False)
-        self.target_fake = torch.autograd.Variable(Tensor(opt.batchSize).fill_(0.0), requires_grad=False)
+        self.input_A = Tensor(opt.batch_size, opt.input_nc, opt.crop_size, opt.crop_size)
+        self.input_B = Tensor(opt.batch_size, opt.output_nc, opt.crop_size, opt.crop_size)
+        self.target_real = torch.autograd.Variable(Tensor(opt.batch_size).fill_(1.0), requires_grad=False)
+        self.target_fake = torch.autograd.Variable(Tensor(opt.batch_size).fill_(0.0), requires_grad=False)
         self.fake_A_buffer = ReplayBuffer()
         self.fake_B_buffer = ReplayBuffer()
-
-        transforms_ = [#transforms.Resize((opt.size, opt.size), Image.BICUBIC),
-			   transforms.Resize(int(opt.size * 1.12), Image.BICUBIC),
-			   transforms.RandomCrop(opt.size),
-			   transforms.RandomHorizontalFlip(),
-			   transforms.ToTensor(),
-			   transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
-        dataloader = DataLoader(MaskImageDataset(opt.dataroot, transforms_=transforms_, unaligned=True),
-						batch_size=opt.batchSize, shuffle=True, num_workers=opt.n_cpu)
 
         print('networks created: ', self.model_names)
 
@@ -116,6 +117,10 @@ class CycleGANModel(BaseModel):
 
         return parser
     
+    def update_learning_rate(self):
+        for lr in self.lrs:
+            lr.step()
+
     def set_input(self, batch):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
 
@@ -128,7 +133,7 @@ class CycleGANModel(BaseModel):
         self.real_B = torch.autograd.Variable(self.input_B.copy_(batch['B']))
         return None
 
-    def forward(self, batch):
+    def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         self.fake_B = self.G_A2B(self.real_A)  # G_A(A)
         self.rec_A = self.G_B2A(self.fake_B)   # G_B(G_A(A))

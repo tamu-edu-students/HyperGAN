@@ -1,5 +1,5 @@
 import importlib
-import tensorflow as tf
+import torch
 from .base_model import BaseModel
 
 
