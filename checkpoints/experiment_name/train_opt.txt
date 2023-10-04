@@ -7,7 +7,7 @@
            continue_train: False                         
                 crop_size: 256                           
         cycle_loss_weight: 10.0                          
-                 dataroot: summer2winter                 	[default: None]
+                 dataroot: shadow_USR                    	[default: None]
              datasets_dir: datasets                      
               epoch_count: 1                             
               epoch_decay: 100                           
