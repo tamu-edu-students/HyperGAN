@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tensorflow.keras as keras
 import time
 from options.train_options import TrainOptions 
 import util as tl
@@ -21,10 +22,11 @@ if __name__ == '__main__':
     d_loss_fn = model.d_loss_fn
     cycle_loss_fn = model.cycle_loss_fn
     identity_loss_fn = model.identity_loss_fn
-    G_lr_scheduler = model.G_lr_scheduler
-    D_lr_scheduler = model.D_lr_scheduler
-    G_optimizer = model.G_optimizer
-    D_optimizer = model.D_optimizer
+    len_dataset = model.len_dataset
+    G_lr_scheduler = networks.LinearDecay(opt.lr, opt.epochs * len_dataset, opt.epoch_decay * len_dataset)
+    D_lr_scheduler = networks.LinearDecay(opt.lr, opt.epochs * len_dataset, opt.epoch_decay * len_dataset)
+    G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=opt.beta_1)
+    D_optimizer = keras.optimizers.Adam(learning_rate=D_lr_scheduler, beta_1=opt.beta_1)
 
     ep_cnt = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
 
@@ -118,10 +120,12 @@ if __name__ == '__main__':
                                     ep_cnt=ep_cnt),
                             py.join(model.output_dir, 'checkpoints'),
                             max_to_keep=5)
-    try:  # restore checkpoint including the epoch counter
-        checkpoint.restore().assert_existing_objects_matched()
-    except Exception as e:
-        print(e)
+try:  # restore checkpoint including the epoch counter
+    checkpoint.restore().assert_existing_objects_matched()
+    print("Restored!!")
+except Exception as e:
+    print(e)
+    print("NOT restored!!")
 
     # summary
     train_summary_writer = tf.summary.create_file_writer(py.join(model.output_dir, 'summaries', 'train'))
@@ -153,6 +157,10 @@ if __name__ == '__main__':
                 if G_optimizer.iterations.numpy() % 100 == 0:
                     A, B = next(test_iter)
                     A2B, B2A, A2B2A, B2A2B = sample(A, B)
+                    data_4d = np.array(A2B)
+                    data_2d = data_4d.reshape(-1, data_4d.shape[-1])
+                    np.savetxt('./yuh', data_2d, fmt='%d', delimiter='\t')
+
                     img = im.immerge(np.concatenate([A, A2B, A2B2A, B, B2A, B2A2B], axis=0), n_rows=2)
                     im.imwrite(img, py.join(sample_dir, 'iter-%09d.jpg' % G_optimizer.iterations.numpy()))
 

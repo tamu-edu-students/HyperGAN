@@ -3,19 +3,20 @@
                batch_size: 1                             
                    beta_1: 0.5                           
       checkpoint_interval: 10                            
-          checkpoints_dir: ./checkpoints                 
-           continue_train: False                         
+          checkpoints_dir: checkpoints                   
                 crop_size: 256                           
+                     cuda: False                         
         cycle_loss_weight: 10.0                          
-                 dataroot: summer2winter                 	[default: None]
+                 dataroot: sda                           	[default: None]
              datasets_dir: datasets                      
-              epoch_count: 1                             
+              epoch_count: 5                             	[default: 1]
               epoch_decay: 100                           
                    epochs: 200                           
-                  gpu_ids:                               
+                  gpu_ids: 0                             
     gradient_penalty_mode: none                          
   gradient_penalty_weight: 10.0                          
      identity_loss_weight: 0.0                           
+                 input_nc: 3                             
                   isTrain: True                          	[default: None]
                  lambda_A: 10.0                          
                  lambda_B: 10.0                          
@@ -23,12 +24,16 @@
                 load_size: 286                           
                        lr: 0.0002                        
                     model: cycle_gan                     
+                    n_cpu: 8                             
                      name: experiment_name               
                no_dropout: True                          
+                output_nc: 3                             
                     phase: train                         
                 pool_size: 50                            
+               print_freq: 100                           
+                  restore: True                          	[default: False]
              save_by_iter: False                         
-          save_epoch_freq: 5                             
+          save_epoch_freq: 1                             
          save_latest_freq: 5000                          
                    suffix:                               
 ----------------- End -------------------
