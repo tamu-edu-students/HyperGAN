@@ -25,7 +25,7 @@ class BaseOptions():
         parser.add_argument('--output_nc', type=int, default=3, help='number of channels of output data')
         parser.add_argument('--lr', type=float, default=0.0002, help='adam: learning rate')
         parser.add_argument('--beta_1', type=float, default=0.5, help='adam: decay of first order momentum of gradient')
-        parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints', help='models are saved here')
+        parser.add_argument('--checkpoints_dir', type=str, default='checkpoints', help='models are saved here')
         parser.add_argument('--checkpoint_interval', type=int, default=10, help='interval between saving model checkpoints')
         parser.add_argument('--load_size', type=int, default=286, help='scale images to this size')
         parser.add_argument('--crop_size', type=int, default=256, help='then crop to this size')

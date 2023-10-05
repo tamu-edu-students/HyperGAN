@@ -1,6 +1,6 @@
 import time
 from options.train_options import TrainOptions 
-import util as tl
+from util import util
 from models import networks, create_model
 from models import create_model
 import pylib as py
@@ -9,7 +9,7 @@ import imlib as im
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from PIL import Image
-from torch.autograd import Variable
+import tqdm
 from dataset.maskshadow_dataset import MaskImageDataset
 import functools
 import torchvision.transforms as transforms
@@ -19,6 +19,7 @@ if __name__ == '__main__':
     opt = TrainOptions().parse()
     model = create_model(opt)
     model.setup(opt)
+    
     
     transforms_ = [#transforms.Resize((opt.size, opt.size), Image.BICUBIC),
         transforms.Resize(int(opt.crop_size * 1.12), Image.Resampling.BICUBIC),
@@ -36,18 +37,23 @@ if __name__ == '__main__':
     D_A_losses = []
     D_B_losses = []
     to_pil = transforms.ToPILImage()
+    total_iters = 0
+
+    
+    sample_dir = py.join(model.output_dir, 'samples_training')
+    py.mkdir(model.output_dir)
+    py.mkdir(sample_dir)
+    py.mkdir(model.checkpoint_dir)
 
 
-
-    for epoch in range(opt.epoch_count, opt.epochs):
+    for epoch in tqdm.trange(opt.epoch_count, opt.epochs, desc='Epoch Loop'):
 
         epoch_start_time = time.time()  # timer for entire epoch
         iter_data_time = time.time()    # timer for data loading per iteration
         epoch_iter = 0
-        total_iters = 0
+        losses_temp = None
 
-
-        for i, batch in enumerate(dataloader):
+        for i, batch in tqdm.tqdm(enumerate(dataloader), desc='Inner Epoch Loop', total=len(dataloader.dataset)):
             
             model.set_input(batch)
             iter_start_time = time.time()
@@ -59,13 +65,42 @@ if __name__ == '__main__':
 
             model.optimize_parameters()
             losses_temp = model.get_current_losses()
-            print(losses_temp)
-            # Set model input
-            
+
+            if epoch_iter % 100 == 0:
+                img_real_A = util.mod_to_pil(model.real_A)
+                img_fake_B = util.mod_to_pil(model.fake_B)
+                img_rec_A = util.mod_to_pil(model.rec_A)
+                img_real_B = util.mod_to_pil(model.real_B)
+                img_fake_A = util.mod_to_pil(model.fake_A)
+                img_rec_B = util.mod_to_pil(model.rec_B)
+
+                images = [img_real_A, img_fake_B, img_rec_A, img_real_B, img_fake_A, img_rec_B]
+                num_rows = 2
+                num_columns = 3
+                image_width, image_height = images[0].size
+                output_width = num_columns * image_width
+                output_height = num_rows * image_height
+
+                output_image = Image.new('RGB', (output_width, output_height))
+                # Paste the individual PIL images onto the output image
+                for i, image in enumerate(images):
+                    row = i // num_columns
+                    col = i % num_columns
+                    x_offset = col * image_width
+                    y_offset = row * image_height
+                    output_image.paste(image, (x_offset, y_offset))
+
+                # Save the combined image as a PNG file
+                output_image.save(py.join(sample_dir, 'epoch-{}-iter-{}.jpg'.format(epoch, epoch_iter)))
+               
+            iter_data_time = time.time()
+
         model.update_learning_rate()
 
-
-
+        if epoch % opt.save_epoch_freq == 0:              # cache our model every <save_epoch_freq> epochs
+            print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
+            model.save_networks(epoch, losses_temp, opt)
+            
 
 
 #     G_A2B = model.G_A2B

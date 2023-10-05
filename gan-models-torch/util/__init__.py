@@ -4,6 +4,7 @@
 # from util.image import *
 # from util.ops import *
 # from util.utils import *
+# import util.util
 
 # physical_devices = tf.config.experimental.list_physical_devices('GPU')
 # for d in physical_devices:

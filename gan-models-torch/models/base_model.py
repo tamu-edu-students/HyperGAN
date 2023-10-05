@@ -2,6 +2,7 @@ import os
 from collections import OrderedDict
 from abc import ABC, abstractmethod
 import torch
+import pylib as py
 
 class BaseModel(ABC):
     """This class is an abstract base class (ABC) for models.
@@ -33,7 +34,8 @@ class BaseModel(ABC):
         self.gpu_ids = opt.gpu_ids
         self.isTrain = opt.isTrain
         self.device = torch.device('cuda:{}'.format(self.gpu_ids[0])) if self.gpu_ids else torch.device('cpu')  # get device name: CPU or GPU
-        self.save_dir = os.path.join(opt.checkpoints_dir, opt.name)  # save all the checkpoints to save_dir
+        self.output_dir = py.join('output', opt.dataroot)  # save all the checkpoints to save_dir
+        self.checkpoint_dir = py.join(self.output_dir, opt.checkpoints_dir)
         self.loss_names = []
         self.model_names = []
         self.visual_names = []
@@ -49,34 +51,71 @@ class BaseModel(ABC):
             opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
         if opt.restore:
-            print
-            'resume training:'
-            self.G_A2B.load_state_dict(torch.load('output/netG_A2B.pth'))
-            self.G_B2A.load_state_dict(torch.load('output/netG_B2A.pth'))
-            self.D_A.load_state_dict(torch.load('output/netD_A.pth'))
-            self.D_B.load_state_dict(torch.load('output/netD_B.pth'))
+            print('resume training:')
+            epoch_dir = py.join(self.checkpoint_dir, 'epoch_{}'.format(opt.epoch_count))
+            for name in self.model_names:
+                save_filename = '%s_net%s.pth' % (opt.epoch_count, name)
+                save_path = py.join(epoch_dir, save_filename)
+                net = getattr(self, name)
+  
+                print("loading from/ ", save_path)
+                net.load_state_dict(torch.load(save_path))
+            
+            for optimizer in self.optimizers:
+                
+                save_filename = '%s_%s.pth' % (opt.epoch_count, optimizer)
+                save_path = py.join(epoch_dir, save_filename)
+                optimizer = getattr(self, optimizer)
+  
+                print("loading from: ", save_path)
+                optimizer.load_state_dict(torch.load(save_path))
 
-            self.optimizer_G.load_state_dict(torch.load('output/optimizer_G.pth'))
-            self.optimizer_D_A.load_state_dict(torch.load('output/optimizer_D_A.pth'))
-            self.optimizer_D_B.load_state_dict(torch.load('output/optimizer_D_B.pth'))
+            for lr in self.lrs:
+                save_filename = '%s_%s.pth' % (opt.epoch_count, lr)
+                save_path = py.join(epoch_dir, save_filename)
+                lr = getattr(self, lr)
 
-            self.lr_scheduler_G.load_state_dict(torch.load('output/lr_scheduler_G.pth'))
-            self.lr_scheduler_D_A.load_state_dict(torch.load('output/lr_scheduler_D_A.pth'))
-            self.lr_scheduler_D_B.load_state_dict(torch.load('output/lr_scheduler_D_B.pth'))
+                print("loading from: ", save_path)
+                lr.load_state_dict(torch.load(save_path))
+            
+            opt.epoch_count += 1 # updating to progress to new epoch
     
-    def save_networks(self, opt):
-        torch.save(self.A2B.state_dict(), 'output/netG_A2B.pth')
-        torch.save(self.G_B2A.state_dict(), 'output/netG_B2A.pth')
-        torch.save(self.D_A.state_dict(), 'output/netD_A.pth')
-        torch.save(self.D_B.state_dict(), 'output/netD_B.pth')
+    def save_networks(self, epoch, losses, opt):
+        """Save all the networks to the disk.
 
-        torch.save(self.optimizer_G.state_dict(), 'output/optimizer_G.pth')
-        torch.save(self.optimizer_D_A.state_dict(), 'output/optimizer_D_A.pth')
-        torch.save(self.optimizer_D_B.state_dict(), 'output/optimizer_D_B.pth')
+        Parameters:
+            epoch (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
+        """
+        epoch_dir = py.join(self.checkpoint_dir, 'epoch_{}'.format(epoch))
+        py.mkdir(epoch_dir)
+        for name in self.model_names:
+            if isinstance(name, str):
+                save_filename = '%s_net%s.pth' % (epoch, name)
+                save_path = py.join(epoch_dir, save_filename)
+                net = getattr(self, name)
 
-        torch.save(self.lr_scheduler_G.state_dict(), 'output/lr_scheduler_G.pth')
-        torch.save(self.lr_scheduler_D_A.state_dict(), 'output/lr_scheduler_D_A.pth')
-        torch.save(self.lr_scheduler_D_B.state_dict(), 'output/lr_scheduler_D_B.pth')
+                print("saving to, ", save_path)
+                torch.save(net.state_dict(), save_path)
+
+        for optimizer in self.optimizers:
+            
+            save_filename = '%s_%s.pth' % (epoch, optimizer)
+            save_path = py.join(epoch_dir, save_filename)
+            optimizer = getattr(self, optimizer)
+
+            torch.save(optimizer.state_dict(), save_path)
+
+        for lr in self.lrs:
+            save_filename = '%s_%s.pth' % (epoch, lr)
+            save_path = py.join(epoch_dir, save_filename)
+            lr = getattr(self, lr)
+
+            print("saving to, ", save_path)
+            torch.save(lr.state_dict(), save_path)
+
+        ordered_dict_str = '\n'.join([f'{key}: {value}' for key, value in losses.items()])
+        with open(py.join(epoch_dir, "losses_epoch_{}.txt".format(epoch)), 'w') as file:
+            file.write(ordered_dict_str)
     
     @staticmethod
     def modify_commandline_options(parser, is_train):

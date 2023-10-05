@@ -33,14 +33,13 @@ class CycleGANModel(BaseModel):
         
         if self.isTrain:
             self.model_names = ['G_A2B', 'G_B2A', 'D_A', 'D_B']
-            print("ummmmmm")
             self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc)
             self.G_B2A = networks.Generator(opt.output_nc, opt.input_nc)
             self.D_A = networks.Discriminator(opt.input_nc)
             self.D_B = networks.Discriminator(opt.output_nc)
 
             if opt.cuda:
-                print("will use GPU")
+                print("Using GPU")
                 self.G_A2B.cuda()
                 self.G_B2A.cuda()
                 self.D_A.cuda()
@@ -59,23 +58,23 @@ class CycleGANModel(BaseModel):
             self.optimizer_G = torch.optim.Adam(itertools.chain(self.G_A2B.parameters(), self.G_B2A.parameters()), lr=opt.lr, betas=(opt.beta_1, 0.999))
             self.optimizer_D_A = torch.optim.Adam(self.D_A.parameters(), lr=opt.lr, betas=(0.5, 0.999))
             self.optimizer_D_B = torch.optim.Adam(self.D_B.parameters(), lr=opt.lr, betas=(0.5, 0.999))
-            self.optimizers.append(self.optimizer_G)
-            self.optimizers.append(self.optimizer_D_A)
-            self.optimizers.append(self.optimizer_D_B)
+            self.optimizers.append('optimizer_G')
+            self.optimizers.append('optimizer_D_A')
+            self.optimizers.append('optimizer_D_B')
             self.lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(self.optimizer_G,
 												   lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step)
             self.lr_scheduler_D_A = torch.optim.lr_scheduler.LambdaLR(self.optimizer_D_A,
 													 lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step)
             self.lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(self.optimizer_D_B,
 													 lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step)
-            self.lrs.append(self.lr_scheduler_G)
-            self.lrs.append(self.lr_scheduler_D_A)
-            self.lrs.append(self.lr_scheduler_D_B)
+            self.lrs.append('lr_scheduler_G')
+            self.lrs.append('lr_scheduler_D_A')
+            self.lrs.append('lr_scheduler_D_B')
             
         else:  # during test time, only load Gs
             self.model_names = ['G_A2B', 'G_B2A']
-            self.G_A2B = networks.Generator_S2F(opt.input_nc, opt.output_nc)
-            self.G_B2A = networks.Generator_F2S(opt.output_nc, opt.input_nc)
+            self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc)
+            self.G_B2A = networks.Generator(opt.output_nc, opt.input_nc)
             self.netG_A2B.apply(weights_init_normal)
             self.netG_B2A.apply(weights_init_normal)
         
@@ -119,7 +118,7 @@ class CycleGANModel(BaseModel):
     
     def update_learning_rate(self):
         for lr in self.lrs:
-            lr.step()
+            getattr(self, lr).step()
 
     def set_input(self, batch):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.

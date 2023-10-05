@@ -3,13 +3,13 @@
                batch_size: 1                             
                    beta_1: 0.5                           
       checkpoint_interval: 10                            
-          checkpoints_dir: ./checkpoints                 
+          checkpoints_dir: checkpoints                   
                 crop_size: 256                           
                      cuda: False                         
         cycle_loss_weight: 10.0                          
-                 dataroot: shadow_USR                    	[default: None]
+                 dataroot: sda                           	[default: None]
              datasets_dir: datasets                      
-              epoch_count: 1                             
+              epoch_count: 5                             	[default: 1]
               epoch_decay: 100                           
                    epochs: 200                           
                   gpu_ids: 0                             
@@ -31,9 +31,9 @@
                     phase: train                         
                 pool_size: 50                            
                print_freq: 100                           
-                  restore: False                         
+                  restore: True                          	[default: False]
              save_by_iter: False                         
-          save_epoch_freq: 5                             
+          save_epoch_freq: 1                             
          save_latest_freq: 5000                          
                    suffix:                               
 ----------------- End -------------------

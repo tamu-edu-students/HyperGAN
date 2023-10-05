@@ -110,7 +110,9 @@ def mask_generator(shadow, shadow_free):
 
 	return mask
 
-
+def mod_to_pil(tensor):
+    img = 0.5 * (tensor.detach().data + 1.0)
+    return (to_pil(img.data.squeeze(0).cpu()))
 
 def tensor2image(tensor):
     image = 127.5*(tensor[0].cpu().float().numpy() + 1.0)
