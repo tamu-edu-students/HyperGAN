@@ -50,8 +50,8 @@ class BaseModel(ABC):
         Parameters:
             opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
-        if opt.restore:
-            print('resume training:')
+        if opt.restore or not self.isTrain:
+            print('resume training, or starting testing...')
             epoch_dir = py.join(self.checkpoint_dir, 'epoch_{}'.format(opt.epoch_count))
             for name in self.model_names:
                 save_filename = '%s_net%s.pth' % (opt.epoch_count, name)

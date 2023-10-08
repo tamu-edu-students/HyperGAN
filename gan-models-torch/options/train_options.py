@@ -9,7 +9,6 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--save_epoch_freq', type=int, default=1, help='frequency of saving checkpoints at the end of epochs')
         parser.add_argument('--save_by_iter', action='store_true', help='whether saves model by iteration')
         parser.add_argument('--print_freq', type=int, default=100, help='frequency of showing training results on console')
-        parser.add_argument('--restore', action='store_true', help='continue training: load the latest model')
-        parser.add_argument('--epoch_count', type=int, default=1, help='the starting epoch count, we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>, ...')
+  
         self.isTrain = True
         return parser

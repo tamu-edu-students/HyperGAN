@@ -11,9 +11,13 @@ class MaskImageDataset(BaseImageDataset):
         self.transform = transforms.Compose(transforms_)
         self.unaligned = unaligned
 
-        self.files_A = sorted(glob.glob(os.path.join(dir, dataroot, 'trainA') + '/*.*'))
-        self.files_B = sorted(glob.glob(os.path.join(dir, dataroot, 'trainB') + '/*.*'))
-
+        if mode == 'train':
+            self.files_A = sorted(glob.glob(os.path.join(dir, dataroot, 'trainA') + '/*.*'))
+            self.files_B = sorted(glob.glob(os.path.join(dir, dataroot, 'trainB') + '/*.*'))
+        elif mode == 'test':
+            self.files_A = sorted(glob.glob(os.path.join(dir, dataroot, 'testA') + '/*.*'))
+            self.files_B = sorted(glob.glob(os.path.join(dir, dataroot, 'testB') + '/*.*'))
+            
     def __getitem__(self, index):
         item_A = self.transform(Image.open(self.files_A[index % len(self.files_A)]))
 

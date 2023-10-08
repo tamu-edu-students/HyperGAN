@@ -8,10 +8,10 @@ from dataset.maskshadow_dataset import MaskImageDataset
 import pylib as py
 import functools
 from PIL import Image
-from util.util import LambdaLR, weights_init_normal, ReplayBuffer
+from util.util import LambdaLR, weights_init_normal, ReplayBuffer, QueueMask, mask_generator
 
 
-class CycleGANModel(BaseModel):
+class MaskShadowGAN(BaseModel):
     """
     This class implements the CycleGAN model, for learning image-to-image translation without paired data.
 
@@ -34,7 +34,7 @@ class CycleGANModel(BaseModel):
         if self.isTrain:
             self.model_names = ['G_A2B', 'G_B2A', 'D_A', 'D_B']
             self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc)
-            self.G_B2A = networks.Generator(opt.output_nc, opt.input_nc)
+            self.G_B2A = networks.Generator_F2S(opt.output_nc, opt.input_nc)
             self.D_A = networks.Discriminator(opt.input_nc)
             self.D_B = networks.Discriminator(opt.output_nc)
 
@@ -74,7 +74,7 @@ class CycleGANModel(BaseModel):
         else:  # during test time, only load Gs
             self.model_names = ['G_A2B', 'G_B2A']
             self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc)
-            self.G_B2A = networks.Generator(opt.output_nc, opt.input_nc)
+            self.G_B2A = networks.Generator_F2S(opt.output_nc, opt.input_nc)
 
             if opt.cuda:
                 print("Using GPU")
@@ -125,6 +125,10 @@ class CycleGANModel(BaseModel):
     def update_learning_rate(self):
         for lr in self.lrs:
             getattr(self, lr).step()
+    
+
+    def mask_init(self, length):
+        self.mask_queue =  QueueMask(length/4)
 
     def set_input(self, batch):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
@@ -141,8 +145,13 @@ class CycleGANModel(BaseModel):
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         self.fake_B = self.G_A2B(self.real_A)  # G_A(A)
-        self.rec_A = self.G_B2A(self.fake_B)   # G_B(G_A(A))
-        self.fake_A = self.G_B2A(self.real_B)  # G_B(B)
+
+        self.mask_queue.insert(mask_generator(self.real_A, self.fake_B))
+        
+        self.rec_A = self.G_B2A(self.fake_B, self.mask_queue.last_item())   # G_B(G_A(A))
+        
+        self.fake_A = self.G_B2A(self.real_B, self.mask_queue.rand_item())  # G_B(B)
+        
         self.rec_B = self.G_A2B(self.fake_A)   # G_A(G_B(B))
 
     def backward_D_basic(self, netD, real, fake):
@@ -197,6 +206,9 @@ class CycleGANModel(BaseModel):
 
         # GAN loss D_A(G_A(A))
         self.loss_G_A2B = self.criterionGAN(self.D_B(self.fake_B), self.target_real)
+
+        
+
         # GAN loss D_B(G_B(B))
         self.loss_G_B2A = self.criterionGAN(self.D_A(self.fake_A), self.target_real)
         # Forward cycle loss || G_B(G_A(A)) - A||

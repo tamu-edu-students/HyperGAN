@@ -37,6 +37,8 @@ class BaseOptions():
         parser.add_argument('--identity_loss_weight', type=float, default=0.0)
         parser.add_argument('--n_cpu', type=int, default=8, help='number of cpu threads to use during batch generation')
         parser.add_argument('--pool_size', type=int, default=50)  # pool size to store fake samples
+        parser.add_argument('--restore', action='store_true', help='continue training: load the latest model')
+        parser.add_argument('--epoch_count', type=int, default=1, help='the starting epoch count, we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>, ...')
 
         self.initialized = True
         return parser
