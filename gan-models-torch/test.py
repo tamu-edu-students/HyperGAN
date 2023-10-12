@@ -44,8 +44,8 @@ if __name__ == '__main__':
         iters += 1
         
         model.forward()
-        #model.get_visuals(iters)
-    model.expand_dataset()
+        model.get_visuals(iters)
+    #model.expand_dataset()
 
 
 
