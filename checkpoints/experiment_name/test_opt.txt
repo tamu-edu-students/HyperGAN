@@ -7,9 +7,9 @@
                 crop_size: 256                           
                      cuda: False                         
         cycle_loss_weight: 10.0                          
-                 dataroot: sda                           	[default: None]
+                 dataroot: shadow_USR                    	[default: None]
              datasets_dir: datasets                      
-              epoch_count: 112                           	[default: 1]
+              epoch_count: 200                           	[default: 1]
               epoch_decay: 100                           
                    epochs: 200                           
                   gpu_ids: 0                             
@@ -20,7 +20,7 @@
                   isTrain: False                         	[default: None]
                 load_size: 256                           
                        lr: 0.0002                        
-                    model: cycle_gan                     
+                    model: maskshadow_gan                	[default: cycle_gan]
                     n_cpu: 8                             
                      name: experiment_name               
                no_dropout: True                          
@@ -28,6 +28,6 @@
                     phase: test                          
                 pool_size: 50                            
                   restore: False                         
-              results_dir: ./results/                    
+              results_dir: samples_testing               
                    suffix:                               
 ----------------- End -------------------

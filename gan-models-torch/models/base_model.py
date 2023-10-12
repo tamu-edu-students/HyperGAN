@@ -36,13 +36,14 @@ class BaseModel(ABC):
         self.device = torch.device('cuda:{}'.format(self.gpu_ids[0])) if self.gpu_ids else torch.device('cpu')  # get device name: CPU or GPU
         self.output_dir = py.join('output', opt.dataroot)  # save all the checkpoints to save_dir
         self.checkpoint_dir = py.join(self.output_dir, opt.checkpoints_dir)
+        self.sample_dir = py.join(self.output_dir, opt.results_dir)
         self.loss_names = []
         self.model_names = []
         self.visual_names = []
         self.optimizers = []
         self.lrs = []
         self.image_paths = []
-        self.metric = 0  # used for learning rate policy 'plateau'
+        self.data_length = 0
 
     def setup(self, opt):
         """Load and print networks; create schedulers
@@ -156,6 +157,12 @@ class BaseModel(ABC):
     def optimize_parameters(self):
         """Calculate losses, gradients, and update network weights; called in every training iteration"""
         pass
+
+    @abstractmethod
+    def get_visuals(self):
+        """Calculate losses, gradients, and update network weights; called in every training iteration"""
+        pass
+
 
     def get_current_losses(self):
         """Return traning losses / errors. train.py will print out these errors on console, and save them to a file"""

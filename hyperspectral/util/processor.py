@@ -23,7 +23,8 @@ class Processor:
                 self.hsi_data = src.read()
             # Access the shape of the data cube (bands, rows, columns)
             bands, rows, cols = self.hsi_data.shape
-            print(bands, " ", rows, " ", cols)
+            print("bands: ", bands, " rows: ", rows, " cols: ", cols)
+           
             return self.hsi_data
         
         # if img_path.find('tif') != -1:
@@ -74,21 +75,23 @@ class Processor:
         # Show the plot
         plt.show()
     
-    def genFalseRGB(self, band_red: int, band_green:int, band_blue:int, hsi_data):
+    def genFalseRGB(self, band_red: int, band_green:int, band_blue:int):
         
-        bands, height, width = hsi_data.shape
+        bands, height, width = self.hsi_data.shape
         # image = Image.new("RGB", (width, height), "white")
         # # Get the pixel access object
         # pixels = image.load()
 
-        red_band_norm = self.normalize_band(hsi_data[band_red])
-        green_band_norm = self.normalize_band(hsi_data[band_green])
-        blue_band_norm = self.normalize_band(hsi_data[band_blue])
+        red_band_norm = self.normalize_band(self.hsi_data[band_red])
+        green_band_norm = self.normalize_band(self.hsi_data[band_green])
+        blue_band_norm = self.normalize_band(self.hsi_data[band_blue])
         rgb_image = np.dstack((red_band_norm, green_band_norm, blue_band_norm))
+        rgb_image = np.uint8(rgb_image)
         plt.imshow(rgb_image)
-        plt.title('False RGB Image')
-        plt.axis('off')
-        plt.show()
+        pil_image = Image.fromarray(rgb_image)
+
+# Show the PIL image if needed
+        pil_image.save(r"C:\Users\vamin\OneDrive\Desktop\CAST\code\HyperGAN\hyperspectral\util\image1.png")
         # for x in range(width):
         #     print(len(hsi_data[band_red][x]))
         #     for y in range(height):

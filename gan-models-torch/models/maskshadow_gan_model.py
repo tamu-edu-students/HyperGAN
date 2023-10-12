@@ -8,10 +8,10 @@ from dataset.maskshadow_dataset import MaskImageDataset
 import pylib as py
 import functools
 from PIL import Image
-from util.util import LambdaLR, weights_init_normal, ReplayBuffer, mod_to_pil
+from util.util import LambdaLR, weights_init_normal, ReplayBuffer, QueueMask, mask_generator, mod_to_pil
 
 
-class CycleGANModel(BaseModel):
+class MaskShadowGANModel(BaseModel):
     """
     This class implements the CycleGAN model, for learning image-to-image translation without paired data.
 
@@ -22,19 +22,24 @@ class CycleGANModel(BaseModel):
 
     CycleGAN paper: https://arxiv.org/pdf/1703.10593.pdf
     """
-
+    
     def __init__(self, opt):
         BaseModel.__init__(self, opt)
         self.loss_names = ['D_A', 'G_A2B', 'cycle_ABA', 'idt_A', 'D_B', 'G_B2A', 'cycle_BAB', 'idt_B']
         self.create_networks(opt)
 
+    def setup(self, opt):
+        super().setup(opt)
+
+        self.mask_queue =  QueueMask(self.data_length/4)
+        print(self.data_length/4)
 
     def create_networks(self, opt):
         
         if self.isTrain:
             self.model_names = ['G_A2B', 'G_B2A', 'D_A', 'D_B']
             self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc)
-            self.G_B2A = networks.Generator(opt.output_nc, opt.input_nc)
+            self.G_B2A = networks.Generator_F2S(opt.output_nc, opt.input_nc)
             self.D_A = networks.Discriminator(opt.input_nc)
             self.D_B = networks.Discriminator(opt.output_nc)
 
@@ -74,7 +79,7 @@ class CycleGANModel(BaseModel):
         else:  # during test time, only load Gs
             self.model_names = ['G_A2B', 'G_B2A']
             self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc)
-            self.G_B2A = networks.Generator(opt.output_nc, opt.input_nc)
+            self.G_B2A = networks.Generator_F2S(opt.output_nc, opt.input_nc)
 
             if opt.cuda:
                 print("Using GPU")
@@ -89,6 +94,8 @@ class CycleGANModel(BaseModel):
         self.input_B = Tensor(opt.batch_size, opt.output_nc, opt.crop_size, opt.crop_size)
         self.target_real = torch.autograd.Variable(Tensor(opt.batch_size).fill_(1.0), requires_grad=False)
         self.target_fake = torch.autograd.Variable(Tensor(opt.batch_size).fill_(0.0), requires_grad=False)
+        self.mask_non_shadow = torch.autograd.Variable(Tensor(opt.batch_size, 1, opt.crop_size, opt.crop_size).fill_(-1.0), requires_grad=False) #-1.0 non-shadow
+
         self.fake_A_buffer = ReplayBuffer()
         self.fake_B_buffer = ReplayBuffer()
 
@@ -125,6 +132,10 @@ class CycleGANModel(BaseModel):
     def update_learning_rate(self):
         for lr in self.lrs:
             getattr(self, lr).step()
+    
+
+    def mask_init(self, length):
+        self.mask_queue =  QueueMask(length/4)
 
     def set_input(self, batch):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
@@ -141,8 +152,17 @@ class CycleGANModel(BaseModel):
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         self.fake_B = self.G_A2B(self.real_A)  # G_A(A)
-        self.rec_A = self.G_B2A(self.fake_B)   # G_B(G_A(A))
-        self.fake_A = self.G_B2A(self.real_B)  # G_B(B)
+
+        self.computed_mask = mask_generator(self.real_A, self.fake_B)
+        self.mask_queue.insert(self.computed_mask)
+
+        
+        self.rec_A = self.G_B2A(self.fake_B, self.mask_queue.last_item())   # G_B(G_A(A))
+        
+
+        self.rand_guide_mask = self.mask_queue.rand_item()
+        self.fake_A = self.G_B2A(self.real_B, self.rand_guide_mask)  # G_B(B)
+        
         self.rec_B = self.G_A2B(self.fake_A)   # G_A(G_B(B))
 
     def backward_D_basic(self, netD, real, fake):
@@ -189,7 +209,7 @@ class CycleGANModel(BaseModel):
             self.idt_A = self.G_A2B(self.real_B)
             self.loss_idt_A = self.criterionIdentity(self.idt_A, self.real_B) * lambda_B * lambda_idt
             # G_B should be identity if real_A is fed: ||G_B(A) - A||
-            self.idt_B = self.G_B2A(self.real_A)
+            self.idt_B = self.G_B2A(self.real_A, self.mask_non_shadow)
             self.loss_idt_B = self.criterionIdentity(self.idt_B, self.real_A) * lambda_A * lambda_idt
         else:
             self.loss_idt_A = 0
@@ -197,6 +217,9 @@ class CycleGANModel(BaseModel):
 
         # GAN loss D_A(G_A(A))
         self.loss_G_A2B = self.criterionGAN(self.D_B(self.fake_B), self.target_real)
+
+        
+
         # GAN loss D_B(G_B(B))
         self.loss_G_B2A = self.criterionGAN(self.D_A(self.fake_A), self.target_real)
         # Forward cycle loss || G_B(G_A(A)) - A||
@@ -226,17 +249,30 @@ class CycleGANModel(BaseModel):
         self.optimizer_D_A.step()  # update D_A and D_B's weights
         self.optimizer_D_B.step()  # update D_A and D_B's weights 
 
-    def get_visuals(self, epoch, epoch_iter):
-        img_real_A = mod_to_pil(self.real_A)
-        img_fake_B = mod_to_pil(self.fake_B)
-        img_rec_A = mod_to_pil(self.rec_A)
-        img_real_B = mod_to_pil(self.real_B)
-        img_fake_A = mod_to_pil(self.fake_A)
-        img_rec_B = mod_to_pil(self.rec_B)
+    def get_visuals(self, epoch_iter, epoch=0):
 
-        images = [img_real_A, img_fake_B, img_rec_A, img_real_B, img_fake_A, img_rec_B]
-        num_rows = 2
-        num_columns = 3
+        images = []
+        num_rows = 0
+        num_columns = 0
+
+        if self.isTrain:
+            images.append(mod_to_pil(self.real_A))
+            images.append(mod_to_pil(self.fake_B))
+            images.append(mod_to_pil(self.rec_A))
+            images.append(mod_to_pil(self.computed_mask))
+            images.append(mod_to_pil(self.real_B))
+            images.append(mod_to_pil(self.fake_A))
+            images.append(mod_to_pil(self.rec_B))
+            images.append(mod_to_pil(self.rand_guide_mask))
+            num_rows = 2
+            num_columns = 4
+        else:
+            images.append(mod_to_pil(self.real_A))
+            images.append(mod_to_pil(self.fake_B))
+            images.append(mod_to_pil(self.computed_mask))
+            num_rows = 1
+            num_columns = 3
+
         image_width, image_height = images[0].size
         output_width = num_columns * image_width
         output_height = num_rows * image_height
@@ -251,4 +287,42 @@ class CycleGANModel(BaseModel):
             output_image.paste(image, (x_offset, y_offset))
 
         # Save the combined image as a PNG file
-        output_image.save(py.join(self.sample_dir, 'epoch-{}-iter-{}.jpg'.format(epoch, epoch_iter)))
+        if self.isTrain:
+            output_image.save(py.join(self.sample_dir, 'epoch-{}-iter-{}.jpg'.format(epoch, epoch_iter)))
+        else:
+            output_image.save(py.join(self.sample_dir, 'img-{}.jpg'.format(epoch_iter)))
+
+    def expand_dataset(self):
+
+        hyper_shadowed = []
+
+        for i in range(int(self.data_length/4)):
+            self.rand_guide_mask = self.mask_queue.rand_item()
+            self.fake_A = self.G_B2A(self.real_B, self.rand_guide_mask)  # G_B(B)
+            print(i)
+            images = []
+            images.append(mod_to_pil(self.real_B))
+            images.append(mod_to_pil(self.fake_A))
+            images.append(mod_to_pil(self.rand_guide_mask))
+            num_rows = 1
+            num_columns = 3
+
+            image_width, image_height = images[0].size
+            output_width = num_columns * image_width
+            output_height = num_rows * image_height
+
+            output_image = Image.new('RGB', (output_width, output_height))
+            
+            # Paste the individual PIL images onto the output image
+            for i, image in enumerate(images):
+                row = i // num_columns
+                col = i % num_columns
+                x_offset = col * image_width
+                y_offset = row * image_height
+                output_image.paste(image, (x_offset, y_offset))
+            hyper_shadowed.append(output_image)
+
+        iter = 0
+        for hs in hyper_shadowed:
+            iter += 1
+            hs.save(py.join(self.sample_dir, 'img-{}.jpg'.format(iter)))

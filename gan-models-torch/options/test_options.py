@@ -9,7 +9,7 @@ class TestOptions(BaseOptions):
 
     def initialize(self, parser):
         parser = BaseOptions.initialize(self, parser)  # define shared options
-        parser.add_argument('--results_dir', type=str, default='./results/', help='saves results here.')
+        parser.add_argument('--results_dir', type=str, default='samples_testing', help='saves results here.')
         # parser.set_defaults(model='test')
         # To avoid cropping, the load_size should be the same as crop_size
         parser.add_argument('--phase', type=str, default='test', help='train, val, test, etc')
