@@ -15,7 +15,7 @@ Download the outputs folder from https://drive.google.com/drive/folders/18rzZWJ-
 
 Move both of these directories into HyperGAN. 
 
-Datasets/ is composed of training datasets with subdirectories of TrainA, TrainB, TestA, and TestB. The code will know which folders to access based on this organization. The output folder consists of results from each dataset. Checkpoints are models that are labeled epoch_(epoch number) where epoch number is how many epochs the model has been trained for. Model progress is saved at the end of each epoch. The models are sampled every 100 iterations during training, and its output is shown in samples_training.
+Datasets/ is composed of training datasets with subdirectories of TrainA, TrainB, TestA, and TestB. The code will know which folders to access based on this organization. The output folder consists of results from each dataset. Checkpoints are models that are labeled epoch_(epoch number) where epoch number is how many epochs the model has been trained for. Model progress is saved at the end of each epoch. The models are sampled every 100 iterations during training, and its output is shown in samples_training. For testing, each image in testA will be deshadowed, and it will be output in samples_testing.
 
 
 To run training, cd into HyperGAN and enter this command
