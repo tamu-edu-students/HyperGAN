@@ -1,5 +1,5 @@
 # HyperGAN
-tools and development for creating a GAN to improve hyperspectral imaging performance
+Tools and development for creating an unsupervised GAN for hyperspectral imaging shadow compensation to increase performance for Autonomous Vehicles. Work conducted as a part of the Connected Autonomous Safe Technologies (CAST) Group.
 
 
 cd into the Docker folder and issue this command to build a docker image:
@@ -22,7 +22,7 @@ To run training, cd into HyperGAN and enter this command
 
 `python gan-models-torch/train.py --dataroot shadow_USR --model maskshadow_gan`
 
-if your training stopped randomly, enter this command (lets say it stopped at epoch 94)
+if your training stopped randomly, enter this command (let's say it stopped at epoch 94)
 
 `python gan-models-torch/train.py --dataroot shadow_USR --model maskshadow_gan --restore --epoch_count 94`
 
