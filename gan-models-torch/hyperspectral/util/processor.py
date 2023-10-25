@@ -8,7 +8,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import cv2
 import cuvis
-import cuvis_tools
+from . import cuvis_tools
 
 class Processor:
     def __init__(self, hsi_data=None, user_settings=None) -> None:
@@ -35,7 +35,7 @@ class Processor:
             self.hsi_data = self.hyperCrop(self.hsi_data, 256)
             self.bands, self.rows, self.cols = self.hsi_data.shape
            
-            print("bands: ", self.bands, " rows: ", self.rows, " cols: ", self.cols)
+            #print("bands: ", self.bands, " rows: ", self.rows, " cols: ", self.cols)
         
         if img_path.find('cu3') != -1:
 
