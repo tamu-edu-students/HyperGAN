@@ -112,6 +112,8 @@ def mask_generator(shadow, shadow_free):
 
 def mod_to_pil(tensor):
     img = 0.5 * (tensor.detach().data + 1.0)
+    tensor_permuted = img.data.squeeze(0).cpu().permute(1,2,0)
+    numpy_array = tensor_permuted.numpy()
     return (to_pil(img.data.squeeze(0).cpu()))
 
 def tensor2image(tensor):
