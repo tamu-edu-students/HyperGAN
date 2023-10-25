@@ -90,12 +90,13 @@ class MaskShadowHsiGANModel(BaseModel):
             self.G_A2B.apply(weights_init_normal)
             self.G_B2A.apply(weights_init_normal)
         
-        Tensor = torch.cuda.FloatTensor if opt.cuda else torch.Tensor
-        self.input_A = Tensor(opt.batch_size, opt.input_nc, 256, 256)
-        self.input_B = Tensor(opt.batch_size, opt.output_nc, 256, 256)
+        Tensor = torch.cuda.FloatTensor if opt.cuda else torch.tensor
+        
+        self.input_A = Tensor(opt.batch_size, opt.input_nc, opt.crop_size, opt.crop_size).to('cuda' if opt.cuda else 'cpu')
+        self.input_B = Tensor(opt.batch_size, opt.output_nc, opt.crop_size, opt.crop_size).to('cuda' if opt.cuda else 'cpu')
         self.target_real = torch.autograd.Variable(Tensor(opt.batch_size).fill_(1.0), requires_grad=False)
         self.target_fake = torch.autograd.Variable(Tensor(opt.batch_size).fill_(0.0), requires_grad=False)
-        self.mask_non_shadow = torch.autograd.Variable(Tensor(opt.batch_size, 1, 256, 256).fill_(-1.0), requires_grad=False) #-1.0 non-shadow
+        self.mask_non_shadow = torch.autograd.Variable(Tensor(opt.batch_size, 1, opt.crop_size, opt.crop_size).fill_(-1.0), requires_grad=False) #-1.0 non-shadow
 
         self.fake_A_buffer = ReplayBuffer()
         self.fake_B_buffer = ReplayBuffer()
@@ -154,7 +155,7 @@ class MaskShadowHsiGANModel(BaseModel):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         self.fake_B = self.G_A2B(self.real_A)  # G_A(A)
 
-        self.computed_mask = mask_generator(self.real_A, self.fake_B)
+        self.computed_mask = mask_generator(self.real_A, self.fake_B, isHyper=True)
         self.mask_queue.insert(self.computed_mask)
 
         
@@ -257,20 +258,20 @@ class MaskShadowHsiGANModel(BaseModel):
         num_columns = 0
 
         if self.isTrain:
-            images.append(mod_to_pil(self.real_A))
-            images.append(mod_to_pil(self.fake_B))
-            images.append(mod_to_pil(self.rec_A))
-            images.append(mod_to_pil(self.computed_mask))
-            images.append(mod_to_pil(self.real_B))
-            images.append(mod_to_pil(self.fake_A))
-            images.append(mod_to_pil(self.rec_B))
-            images.append(mod_to_pil(self.rand_guide_mask))
+            images.append(mod_to_pil(self.real_A, True))
+            images.append(mod_to_pil(self.fake_B, True))
+            images.append(mod_to_pil(self.rec_A, True))
+            images.append(mod_to_pil(self.computed_mask, False))
+            images.append(mod_to_pil(self.real_B, True))
+            images.append(mod_to_pil(self.fake_A, True))
+            images.append(mod_to_pil(self.rec_B, True))
+            images.append(mod_to_pil(self.rand_guide_mask, False))
             num_rows = 2
             num_columns = 4
         else:
-            images.append(mod_to_pil(self.real_A))
-            images.append(mod_to_pil(self.fake_B))
-            images.append(mod_to_pil(self.computed_mask))
+            images.append(mod_to_pil(self.real_A, True))
+            images.append(mod_to_pil(self.fake_B, True))
+            images.append(mod_to_pil(self.computed_mask, False))
             num_rows = 1
             num_columns = 3
 

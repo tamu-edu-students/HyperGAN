@@ -79,7 +79,7 @@ if __name__ == '__main__':
             model.optimize_parameters()
             losses_temp = model.get_current_losses()
 
-            if total_iters % 100 == 0:
+            if total_iters % 15 == 0:
                 model.get_visuals(epoch_iter, epoch)
                
             iter_data_time = time.time()
