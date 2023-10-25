@@ -19,7 +19,7 @@ class BaseOptions():
         parser.add_argument('--suffix', default='', type=str, help='customized suffix: opt.name = opt.name + suffix: e.g., {model}_{netG}_size{load_size}')
         parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
         parser.add_argument('--cuda', action='store_true', help='use GPU computation')
-        parser.add_argument('--epochs', type=int, default=200)
+        parser.add_argument('--epochs', type=int, default=1000)
         parser.add_argument('--epoch_decay', type=int, default=100, help='epoch to start decaying learning rate')
         parser.add_argument('--input_nc', type=int, default=3, help='number of channels of input data')
         parser.add_argument('--output_nc', type=int, default=3, help='number of channels of output data')

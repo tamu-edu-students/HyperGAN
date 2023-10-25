@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from PIL import Image
 import tqdm
-from dataset.maskshadow_dataset import MaskImageDataset
+from dataset.hyperspectral_dataset import HyperspectralImageDataset
 import functools
 import torchvision.transforms as transforms
 
@@ -18,16 +18,26 @@ if __name__ == '__main__':
     
     opt = TrainOptions().parse()
 
-    transforms_ = [#transforms.Resize((opt.size, opt.size), Image.BICUBIC),
-        transforms.Resize(int(opt.crop_size * 1.12), Image.Resampling.BICUBIC),
-        transforms.RandomCrop(opt.crop_size),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
-    
-    dataloader = DataLoader(MaskImageDataset(opt.datasets_dir, opt.dataroot, transforms_=transforms_, unaligned=True, mode='train'),
-                batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
+    # transforms_ = [#transforms.Resize((opt.size, opt.size), Image.BICUBIC),
+    #     transforms.Resize(int(opt.crop_size * 1.12), Image.Resampling.BICUBIC),
+    #     transforms.RandomCrop(opt.crop_size),
+    #     transforms.RandomHorizontalFlip(),
+    #     transforms.ToTensor(),
+    #     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
 
+    mean_values = np.array([0.5] * opt.input_nc)  # 51 channels with a mean of 0.5
+    std_values = np.array([0.5] * opt.input_nc)   # 51 channels with a standard deviation of 0.5
+
+    transforms_ = [
+        #transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(mean_values.tolist(), std_values.tolist())
+        ]
+    
+    # dataloader = DataLoader(MaskImageDataset(opt.datasets_dir, opt.dataroot, transforms_=transforms_, unaligned=True, mode='train'),
+    #             batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
+    dataloader = DataLoader(HyperspectralImageDataset(opt.datasets_dir, opt.dataroot, True, transforms_=transforms_, unaligned=True, mode='train'),
+                batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
    
     model = create_model(opt)
     model.data_length = len(dataloader.dataset)
@@ -69,7 +79,7 @@ if __name__ == '__main__':
             model.optimize_parameters()
             losses_temp = model.get_current_losses()
 
-            if epoch_iter % 100 == 0:
+            if total_iters % 100 == 0:
                 model.get_visuals(epoch_iter, epoch)
                
             iter_data_time = time.time()
