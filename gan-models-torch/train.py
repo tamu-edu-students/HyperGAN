@@ -25,8 +25,8 @@ if __name__ == '__main__':
     #     transforms.ToTensor(),
     #     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
 
-    mean_values = np.array([0.5] * opt.input_nc)  # 51 channels with a mean of 0.5
-    std_values = np.array([0.5] * opt.input_nc)   # 51 channels with a standard deviation of 0.5
+    mean_values = np.array([0.5] * opt.input_nc)  # input_nc channels with a mean of 0.5
+    std_values = np.array([0.5] * opt.input_nc)   # input_nc channels with a standard deviation of 0.5
 
     transforms_ = [
         #transforms.RandomHorizontalFlip(),
@@ -65,6 +65,9 @@ if __name__ == '__main__':
         iter_data_time = time.time()    # timer for data loading per iteration
         epoch_iter = 0
         losses_temp = None
+        G_loss_temp = 0
+        D_A_loss_temp = 0
+        D_B_loss_temp = 0
 
         for i, batch in tqdm.tqdm(enumerate(dataloader), desc='Inner Epoch Loop', total=len(dataloader.dataset)):
             
@@ -72,21 +75,29 @@ if __name__ == '__main__':
             iter_start_time = time.time()
             if total_iters % opt.print_freq == 0:
                 t_data = iter_start_time - iter_data_time
-            
-            total_iters += opt.batch_size
-            epoch_iter += opt.batch_size
 
             model.optimize_parameters()
             losses_temp = model.get_current_losses()
+            G_loss_temp += losses_temp["G_A2B"]
+            D_A_loss_temp += losses_temp["D_A"]
+            D_B_loss_temp += losses_temp["D_B"]
 
             if total_iters % 15 == 0:
                 model.get_visuals(epoch_iter, epoch)
                
             iter_data_time = time.time()
+            total_iters += opt.batch_size
+            epoch_iter += opt.batch_size
 
         model.update_learning_rate()
 
         if epoch % opt.save_epoch_freq == 0:              # cache our model every <save_epoch_freq> epochs
             print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
             model.save_networks(epoch, losses_temp, opt)
+            G_losses.append(G_loss_temp / epoch_iter)
+            D_A_losses.append(D_A_loss_temp / epoch_iter)
+            D_B_losses.append(D_B_loss_temp/ epoch_iter)
+            model.plot_losses(epoch, opt.save_epoch_freq, G_losses, D_A_losses, D_B_losses)
+            model.gen_rec_success()
+            
             

@@ -5,16 +5,13 @@ from PIL import Image
 import os
 import torch
 import random
-import time
-import datetime
-import sys
 import matplotlib.pyplot as plt
 from torch.autograd import Variable
 import torch
 # from visdom import Visdom
 import torchvision.transforms as transforms
 from skimage.filters import threshold_otsu
-
+from .constants import HyperConstants
 
 
 def save_image(image_numpy, image_path, aspect_ratio=1.0):
@@ -123,12 +120,28 @@ def mod_to_pil(tensor, isHyper=False):
         tensor_permuted = img.data.squeeze(0).cpu().permute(1,2,0)
         arr = tensor_permuted.numpy()
 
-        red = normalize_band(arr[:, :, 25])
-        green = normalize_band(arr[:, :, 12])
-        blue = normalize_band(arr[:, :, 3])
+        red = normalize_band(arr[:, :, HyperConstants.RED_BAND])
+        green = normalize_band(arr[:, :, HyperConstants.GREEN_BAND])
+        blue = normalize_band(arr[:, :, HyperConstants.BLUE_BAND])
         rgb_image = np.dstack((red, green, blue))
 
         return (to_pil(rgb_image))
+
+def tensor2spectral(tensor, x, y):
+    
+    arr_list = []
+
+    img = 0.5 * (tensor.detach().data + 1.0)
+    tensor_permuted = img.data.squeeze(0).cpu().permute(1,2,0)
+    arr = tensor_permuted.numpy()
+
+    for i in range(arr.shape[2]):
+        twoD = normalize_band(arr[:, :, i])
+        arr_list.append(twoD)
+    
+    image = np.dstack(arr_list)
+    #print(image.shape)
+    return image[x, y, :]
 
 def tensor2image(tensor):
     image = 127.5*(tensor[0].cpu().float().numpy() + 1.0)

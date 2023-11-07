@@ -170,21 +170,21 @@ def prettyprint_attributes(mesu: cuvis.Measurement) -> None:
 
 def exporter(file_type, domain):
     
-    userSettingsDir = "./datasets/hsi/ultris5/" 
-    measurementLoc = "./datasets/hsi/train{}/".format(domain) 
-    darkLoc = "./datasets/hsi/Calibration/dark__session_000_015_snapshot16976577013877078.cu3"
-    whiteLoc = "./datasets/hsi/Calibration/white__session_000_017_snapshot16976577395328359.cu3"
-    distanceLoc = "./datasets/hsi/Calibration/distanceCalib__session_000_010_snapshot16976559049021536.cu3"
-    factoryDir = "./datasets/hsi/ultris5/"
-    outDir = "./datasets/export/"
+    userSettingsDir = "./datasets/hsi_2/ultris5/" 
+    measurementLoc = "./datasets/hsi_2/train{}/".format(domain) 
+    # darkLoc = "./datasets/hsi/Calibration/dark__session_000_015_snapshot16976577013877078.cu3"
+    # whiteLoc = "./datasets/hsi/Calibration/white__session_000_017_snapshot16976577395328359.cu3"
+    # distanceLoc = "./datasets/hsi/Calibration/distanceCalib__session_000_010_snapshot16976559049021536.cu3"
+    factoryDir = "./datasets/hsi_2/ultris5/"
+    outDir = "./datasets/export_2/"
     cu3_files = glob.glob(os.path.join(measurementLoc, "*.cu3"))
 
     for cu3_file in cu3_files:
         mesu = cuvis.Measurement(cu3_file)
         prettyprint_attributes(mesu)
-        if file_type == "envi":
+        if file_type == "tiff":
             if mesu.ProcessingMode != "Reflectance":
-          
+                break
                 reprocessMeasurement(userSettingsDir,cu3_file,darkLoc,whiteLoc,distanceLoc,factoryDir,os.path.join(outDir, "train{}".format(domain)), visualize=False, export=True)
             else:
                 tiff_settings = cuvis.TiffExportSettings(
@@ -195,13 +195,13 @@ def exporter(file_type, domain):
 
 if __name__ == "__main__":
 
-    userSettingsDir1 = "./datasets/hsi/ultris5/" 
-    measurementLoc1 = "./datasets/hsi/trainA/session_000_020_snapshot.cu3" 
-    darkLoc = "./datasets/hsi/Calibration/dark__session_000_015_snapshot16976577013877078.cu3"
-    whiteLoc = "./datasets/hsi/Calibration/white__session_000_017_snapshot16976577395328359.cu3"
-    distanceLoc = "./datasets/hsi/Calibration/distanceCalib__session_000_010_snapshot16976559049021536.cu3"
-    factoryDir = "./datasets/hsi/ultris5/"
-    outDir = "./datasets/export/"
+    # userSettingsDir1 = "./datasets/hsi/ultris5/" 
+    # measurementLoc1 = "./datasets/hsi/trainA/session_000_020_snapshot.cu3" 
+    # darkLoc = "./datasets/hsi/Calibration/dark__session_000_015_snapshot16976577013877078.cu3"
+    # whiteLoc = "./datasets/hsi/Calibration/white__session_000_017_snapshot16976577395328359.cu3"
+    # distanceLoc = "./datasets/hsi/Calibration/distanceCalib__session_000_010_snapshot16976559049021536.cu3"
+    # factoryDir = "./datasets/hsi/ultris5/"
+    # outDir = "./datasets/export/"
 
     # userSettingsDir = "../HyperImages/ultris20/" 
     # measurementLoc = "../HyperImages/hypertest/session_000/session_002_230.cu3"
@@ -234,7 +234,7 @@ if __name__ == "__main__":
     # # print(eval_metrics.PSNR(img[10], img[11]))
     
     # # p.genFalseRGB(36, 18, 10, img)
-    exporter("envi", "B")
+    exporter("tiff", "B")
     # print("Export to Envi...")
    
     # # for i in range(4, 210):

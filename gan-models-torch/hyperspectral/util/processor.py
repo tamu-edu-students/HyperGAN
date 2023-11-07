@@ -2,6 +2,7 @@ import numpy as np
 import spectral as spy
 import spectral.io.envi as envi
 import scipy.io as sio
+import io
 from scipy.ndimage import zoom
 import rasterio as rio
 from PIL import Image
@@ -130,8 +131,11 @@ class Processor:
     def normalize_band(self, band):
         return ((band - band.min()) / (band.max() - band.min()) * 255).astype(np.uint8)
 
-p = Processor() 
-p.prepare_data(r'/workspaces/HyperGAN/datasets/export/trainB/session_000_058_snapshot_ref.tiff')
+
+
+
+# p = Processor() 
+# p.prepare_data(r'/workspaces/HyperGAN/datasets/export/trainB/session_000_058_snapshot_ref.tiff')
 # # # p.genFalseRGB(25,12,3,visualize=True)
 # # # # #plt.imshow(p.hsi_data[12, :, :], cmap='gray')
 # # # plt.show()
