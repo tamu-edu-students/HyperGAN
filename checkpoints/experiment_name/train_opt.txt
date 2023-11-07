@@ -7,7 +7,7 @@
                 crop_size: 256                           
                      cuda: False                         
         cycle_loss_weight: 10.0                          
-                 dataroot: export                        	[default: None]
+                 dataroot: export_2                      	[default: None]
              datasets_dir: datasets                      
               epoch_count: 1                             
               epoch_decay: 100                           
@@ -35,7 +35,7 @@
                   restore: False                         
               results_dir: samples_training              
              save_by_iter: False                         
-          save_epoch_freq: 10                            
+          save_epoch_freq: 2                             	[default: 1]
          save_latest_freq: 5000                          
                    suffix:                               
 ----------------- End -------------------

@@ -3,6 +3,10 @@ from collections import OrderedDict
 from abc import ABC, abstractmethod
 import torch
 import pylib as py
+import matplotlib.pyplot as plt
+import numpy as np
+import io
+from PIL import Image
 
 class BaseModel(ABC):
     """This class is an abstract base class (ABC) for models.
@@ -171,3 +175,24 @@ class BaseModel(ABC):
             if isinstance(name, str):
                 errors_ret[name] = float(getattr(self, 'loss_' + name))  # float(...) works for both scalar tensor and float number
         return errors_ret
+    
+    def plot_losses(self, epoch, save_freq, errors_G, errors_D_A, errors_D_B):
+
+        plt.clf()
+        band_numbers = np.arange(1, epoch+1, save_freq)
+        plt.plot(band_numbers, errors_G,  label='Generator Loss')
+        plt.plot(band_numbers, errors_D_A, label='Discriminator Loss: Shadow')
+        plt.plot(band_numbers, errors_D_B, label='Discriminator Loss: Nonshadow')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss Value')
+        plt.title('Loss for Subnet Over Epochs')
+        plt.legend()
+
+        buffer = io.BytesIO()
+
+        # Save the Matplotlib plot to the BytesIO buffer as a PIL image
+        plt.savefig(buffer, format='png')
+        buffer.seek(0)  # Move the buffer cursor to the beginning
+        
+        Image.open(buffer).save(py.join(self.checkpoint_dir, 'losses_{}.png'.format(epoch)))
+        # Open the PIL image from the BytesIO buffer

@@ -6,10 +6,11 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from dataset.maskshadow_dataset import MaskImageDataset
 import pylib as py
-import functools
-from PIL import Image
-from util.util import LambdaLR, weights_init_normal, ReplayBuffer, QueueMask, mask_generator, mod_to_pil
-
+import random
+from PIL import Image, ImageDraw
+from util.util import LambdaLR, weights_init_normal, ReplayBuffer, QueueMask, mask_generator, mod_to_pil, tensor2spectral
+from util.constants import highlight_points
+from hyperspectral.util import utils
 
 class MaskShadowHsiGANModel(BaseModel):
     """
@@ -328,3 +329,70 @@ class MaskShadowHsiGANModel(BaseModel):
         for hs in hyper_shadowed:
             iter += 1
             hs.save(py.join(self.sample_dir, 'img-{}.jpg'.format(iter)))
+
+    def gen_rec_success(self):
+        
+        images = []
+        ground_truth = self.real_A
+        shadowed = self.real_A
+        reconstructed = self.fake_B
+
+        # print("gt shape:", ground_truth.shape)
+        # print("shadowed shape: ", shadowed.shape)
+        # print("reconstructed shape:", reconstructed.shape)
+
+        ground_truth_rgb = mod_to_pil(ground_truth, True)
+        shadowed_rgb = mod_to_pil(shadowed, True)
+        reconstructed_rgb = mod_to_pil(reconstructed, True)
+
+        draw_gt = ImageDraw.Draw(ground_truth_rgb)
+        draw_shadowed = ImageDraw.Draw(shadowed_rgb)
+        draw_reconstructed = ImageDraw.Draw(reconstructed_rgb)
+
+        # Get the width and height of the image
+        width, height = shadowed_rgb.size
+
+        #utils.highlight_selector(shadowed_rgb, reconstructed_rgb)
+
+        # Generate random points and overlay boxes
+        for i in range(len(highlight_points)):
+            x = random.randint(0, width - 1)
+            y = random.randint(0, height - 1)
+
+            images.append(utils.spectral_plot(tensor2spectral(ground_truth, x , y),tensor2spectral(shadowed, x , y), tensor2spectral(reconstructed, x , y), highlight_points[i]))
+
+            box_size = 10  # Adjust the size of the box as needed
+            draw_gt.rectangle([x, y, x + box_size, y + box_size], outline=highlight_points[i], width=3)
+            draw_shadowed.rectangle([x, y, x + box_size, y + box_size], outline=highlight_points[i], width=3) 
+            draw_reconstructed.rectangle([x, y, x + box_size, y + box_size], outline=highlight_points[i], width=3)   # You can change the box color and width
+
+        images.append(ground_truth_rgb)
+        images.append(shadowed_rgb)
+        images.append(reconstructed_rgb)
+
+        num_rows = 3
+        num_columns = 3
+
+        image_width, image_height = images[0].size
+        output_width = num_columns * image_width
+        output_height = num_rows * image_height
+
+        output_image = Image.new('RGB', (output_width, output_height))
+        # Paste the individual PIL images onto the output image
+        for i, image in enumerate(images):
+            row = i // num_columns
+            col = i % num_columns
+            x_offset = col * image_width
+            y_offset = row * image_height
+            output_image.paste(image, (x_offset, y_offset))
+
+        # Save the combined image as a PNG file
+        
+        output_image.save(py.join(self.sample_dir, 'img-{}.jpg'.format(65555)))
+        # Save the modified image
+        shadowed_rgb.save('output_image.jpg')  
+
+        
+
+
+
