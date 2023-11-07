@@ -7,33 +7,35 @@
                 crop_size: 256                           
                      cuda: False                         
         cycle_loss_weight: 10.0                          
-                 dataroot: shadow_USR                    	[default: None]
+                 dataroot: export_2                      	[default: None]
              datasets_dir: datasets                      
               epoch_count: 1                             
               epoch_decay: 100                           
-                   epochs: 200                           
+                   epochs: 1000                          
                   gpu_ids: 0                             
     gradient_penalty_mode: none                          
   gradient_penalty_weight: 10.0                          
      identity_loss_weight: 0.0                           
-                 input_nc: 3                             
+                 input_nc: 51                            	[default: 3]
                   isTrain: True                          	[default: None]
+                iter_loss: 500                           
                  lambda_A: 10.0                          
                  lambda_B: 10.0                          
           lambda_identity: 0.5                           
                 load_size: 286                           
                        lr: 0.0002                        
-                    model: maskshadow_gan                	[default: cycle_gan]
+                    model: maskshadow_hsi_gan            	[default: cycle_gan]
                     n_cpu: 8                             
                      name: experiment_name               
                no_dropout: True                          
-                output_nc: 3                             
+                output_nc: 51                            	[default: 3]
                     phase: train                         
                 pool_size: 50                            
                print_freq: 100                           
                   restore: False                         
+              results_dir: samples_training              
              save_by_iter: False                         
-          save_epoch_freq: 1                             
+          save_epoch_freq: 2                             	[default: 1]
          save_latest_freq: 5000                          
                    suffix:                               
 ----------------- End -------------------

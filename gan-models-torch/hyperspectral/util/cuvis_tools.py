@@ -1,6 +1,7 @@
 #from processor import Processor
 #import eval_metrics
 import os
+import glob
 import cuvis
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,7 +12,7 @@ from multiprocessing import cpu_count, Process, Value, Array, Pool, TimeoutError
 
 #from cuvis.Export import EnviExporter
 
-def   reprocessMeasurement(userSettingsDir,measurementLoc,darkLoc,whiteLoc,distanceLoc,factoryDir,outDir, visualize=False):    
+def reprocessMeasurement(userSettingsDir,measurementLoc,darkLoc,whiteLoc,distanceLoc,factoryDir,outDir, visualize=False, export=False):    
     
     print("loading user settings...")
     settings = cuvis.General(userSettingsDir)
@@ -55,7 +56,12 @@ def   reprocessMeasurement(userSettingsDir,measurementLoc,darkLoc,whiteLoc,dista
             processingContext.setProcessingArgs(procArgs)
             mesu = processingContext.apply(mesu)
             cube = mesu.Data.pop("cube", None)
-            
+            if export:
+                tiff_settings = cuvis.TiffExportSettings(
+                    ExportDir=outDir)
+                tiffExporter = cuvis.TiffExporter(tiff_settings)
+                print("saving ", outDir)
+                tiffExporter.apply(mesu)
             if cube is None:
                 raise Exception("Cube not found")
 
@@ -87,7 +93,7 @@ def   reprocessMeasurement(userSettingsDir,measurementLoc,darkLoc,whiteLoc,dista
         plt.show()
     
     #print("finished.")
-    return cube
+    return cube, mesu
     
 def loadMeasurement(userSettingsDir, measurementLoc, visualize=False):
 
@@ -155,62 +161,81 @@ def extract_rgb(cube, red_layer=78 , green_layer=40, blue_layer=25,  visualize=F
         plt.imshow(image)
         plt.show()
     return image  
-# if __name__== '__main__':
-    
-#     dir = 'datasets'
-#     dataroot = 'lentils'
-#     dataset_dir = sorted(glob.glob(os.path.join(dir, dataroot) + '/*.*'))
-#     images =[]
-#     # ret, images = cv2.imreadmulti(mats=images,
-#     #                           filename=r"C:\Users\vamin\OneDrive\Desktop\CAST\code\HyperGAN\datasets\lentils\lentil.tiff",
-#     #                           start=0,
-#     #                           count=2,
-#     #                           flags=cv2.IMREAD_ANYCOLOR)
-#     # sys_root = './Dataset/'
-#     # im_name = 'indian_pines'
 
-#     # img_path = sys_root + im_name + '.tif'
-#     # print(img_path)
-#     # #e = EnviExporter()
-#     p = Processor()
-#     img = p.prepare_data(r"C:\Users\vamin\OneDrive\Desktop\CAST\code\HyperGAN\datasets\lentils\lentil.tiff")
-#     p.genFalseRGB(27, 10, 3)
+
 def prettyprint_attributes(mesu: cuvis.Measurement) -> None:
     for attribute in dir(mesu):
         if type(getattr(mesu, attribute)).__name__ not in ['builtin_function_or_method', 'method'] and '__' not in attribute:
             print(f'{attribute}:\t{getattr(mesu, attribute)}')
 
+def exporter(file_type, domain):
+    
+    userSettingsDir = "./datasets/hsi_2/ultris5/" 
+    measurementLoc = "./datasets/hsi_2/train{}/".format(domain) 
+    # darkLoc = "./datasets/hsi/Calibration/dark__session_000_015_snapshot16976577013877078.cu3"
+    # whiteLoc = "./datasets/hsi/Calibration/white__session_000_017_snapshot16976577395328359.cu3"
+    # distanceLoc = "./datasets/hsi/Calibration/distanceCalib__session_000_010_snapshot16976559049021536.cu3"
+    factoryDir = "./datasets/hsi_2/ultris5/"
+    outDir = "./datasets/export_2/"
+    cu3_files = glob.glob(os.path.join(measurementLoc, "*.cu3"))
+
+    for cu3_file in cu3_files:
+        mesu = cuvis.Measurement(cu3_file)
+        prettyprint_attributes(mesu)
+        if file_type == "tiff":
+            if mesu.ProcessingMode != "Reflectance":
+                break
+                reprocessMeasurement(userSettingsDir,cu3_file,darkLoc,whiteLoc,distanceLoc,factoryDir,os.path.join(outDir, "train{}".format(domain)), visualize=False, export=True)
+            else:
+                tiff_settings = cuvis.TiffExportSettings(
+                    ExportDir=os.path.join(outDir, "train{}".format(domain)))
+                tiffExporter = cuvis.TiffExporter(tiff_settings)
+                print("saving ", cu3_file)
+                tiffExporter.apply(mesu)
 
 if __name__ == "__main__":
 
+    # userSettingsDir1 = "./datasets/hsi/ultris5/" 
+    # measurementLoc1 = "./datasets/hsi/trainA/session_000_020_snapshot.cu3" 
+    # darkLoc = "./datasets/hsi/Calibration/dark__session_000_015_snapshot16976577013877078.cu3"
+    # whiteLoc = "./datasets/hsi/Calibration/white__session_000_017_snapshot16976577395328359.cu3"
+    # distanceLoc = "./datasets/hsi/Calibration/distanceCalib__session_000_010_snapshot16976559049021536.cu3"
+    # factoryDir = "./datasets/hsi/ultris5/"
+    # outDir = "./datasets/export/"
 
+    # userSettingsDir = "../HyperImages/ultris20/" 
+    # measurementLoc = "../HyperImages/hypertest/session_000/session_002_230.cu3"
     
-    userSettingsDir = "../HyperImages/ultris20/" 
-    measurementLoc = "../HyperImages/cornfields/session_002/session_002_230.cu3"
-    darkLoc = "../HyperImages/cornfields/Calibration/dark__session_002_003_snapshot16423119279414228.cu3"
-    whiteLoc = "../HyperImages/cornfields/Calibration/white__session_002_752_snapshot16423136896447489.cu3"
-    distanceLoc = "../HyperImages/cornfields/Calibration/distanceCalib__session_000_790_snapshot16423004058237746.cu3"
-    factoryDir = "../HyperImages/ultris20/"
-    outDir ="../HyperImages/export/"
-    print("loading measurement file...")
-    mesu = cuvis.Measurement(measurementLoc)
+    # print("loading measurement file...")
+    # mesu = cuvis.Measurement(measurementLoc1)
     # cube = mesu.Data.pop("cube", None)
-    # # Let's examine our measurement
-    prettyprint_attributes(mesu)
+    # # # Let's examine our measurement
+    # prettyprint_attributes(mesu)
 
     #data = mesu.Data["cube"].array
 # Let's look at the shape of the hypercube
     #print(f'Rows: {data.shape[0]}, Columns: {data.shape[1]}, Bands: {data.shape[2]}')
-    cube = reprocessMeasurement(userSettingsDir,measurementLoc,darkLoc,whiteLoc,distanceLoc,factoryDir,outDir, False)
-    data = cube.array[:,:, :] # x,y,chan
-    print("rows: ", data.shape[0], "cols: ",   data.shape[1], "bands",  data.shape[2] )
-    rgb_img= extract_rgb(cube,visualize=True)
+    #cube,mesu = reprocessMeasurement(userSettingsDir1,measurementLoc1,darkLoc,whiteLoc,distanceLoc,factoryDir,outDir, False)
+    # envi_settings = cuvis.EnviExportSettings(
+    #             ExportDir=os.path.join(outDir, "train{}".format("domain")))
+    # enviExporter = cuvis.Export.CubeExporter
+    # EnviExporter(envi_settings)
+    # print("saving !!!!!!!!")
+    # enviExporter.apply(mesu)
+    # #cube= loadMeasurement(userSettingsDir1, measurementLoc1, False)
+    # #cube = mesu.Data.pop("cube", None)
+    # data = cube.array[50,100, 30] # x,y,chan
+    # print(data)
+    # print("rows: ", data.shape[0], "cols: ",   data.shape[1], "bands",  data.shape[2] )
+    # rgb_img= extract_rgb(cube, red_layer=26, green_layer=12, blue_layer=1, visualize=True)
     # #p.display_band(img, 40)
     # # p.display_band(img, 56)
     # print(eval_metrics.correlation(img[10], img[200]))
     # # print(eval_metrics.PSNR(img[10], img[11]))
     
     # # p.genFalseRGB(36, 18, 10, img)
-
+    exporter("tiff", "B")
+    # print("Export to Envi...")
+   
     # # for i in range(4, 210):
     # #     print(eval_metrics.SSIM(img[4], img[i]))

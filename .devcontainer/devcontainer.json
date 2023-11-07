@@ -30,7 +30,9 @@
 	// below is used when cuda image is being used
 	"runArgs": [
 		"--gpus",
-		"all"
+		"all", 
+		"--ipc=host"
+
 	]
 
 }

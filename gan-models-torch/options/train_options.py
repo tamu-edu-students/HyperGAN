@@ -10,5 +10,7 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--save_epoch_freq', type=int, default=1, help='frequency of saving checkpoints at the end of epochs')
         parser.add_argument('--save_by_iter', action='store_true', help='whether saves model by iteration')
         parser.add_argument('--print_freq', type=int, default=100, help='frequency of showing training results on console')
+        parser.add_argument('--iter_loss', type=int, default=500, help='average loss for n iterations')
+
         self.isTrain = True
         return parser

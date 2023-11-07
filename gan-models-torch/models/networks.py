@@ -1,8 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-# from torchsummary import summary
-# import torch
 
 class ResidualBlock(nn.Module):
     def __init__(self, in_features):

@@ -5,16 +5,13 @@ from PIL import Image
 import os
 import torch
 import random
-import time
-import datetime
-import sys
-
+import matplotlib.pyplot as plt
 from torch.autograd import Variable
 import torch
 # from visdom import Visdom
 import torchvision.transforms as transforms
 from skimage.filters import threshold_otsu
-
+from .constants import HyperConstants
 
 
 def save_image(image_numpy, image_path, aspect_ratio=1.0):
@@ -99,20 +96,52 @@ class QueueMask():
 
 
 
-def mask_generator(shadow, shadow_free):
-	im_f = to_gray(to_pil(((shadow_free.data.squeeze(0) + 1.0) * 0.5).cpu()))
-	im_s = to_gray(to_pil(((shadow.data.squeeze(0) + 1.0) * 0.5).cpu()))
+def mask_generator(shadow, shadow_free, isHyper=False):
+    
+    im_f = to_gray(mod_to_pil(shadow_free, isHyper))
+    im_s = to_gray(mod_to_pil(shadow, isHyper))
+	# im_f = to_gray(to_pil(((shadow_free.data.squeeze(0) + 1.0) * 0.5).cpu()))
+	# im_s = to_gray(to_pil(((shadow.data.squeeze(0) + 1.0) * 0.5).cpu()))
 
-	diff = (np.asarray(im_f, dtype='float32')- np.asarray(im_s, dtype='float32')) # difference between shadow image and shadow_free image
-	L = threshold_otsu(diff)
-	mask = torch.tensor((np.float32(diff >= L)-0.5)/0.5).unsqueeze(0).unsqueeze(0).cuda() #-1.0:non-shadow, 1.0:shadow
-	mask.requires_grad = False
+    diff = (np.asarray(im_f, dtype='float32')- np.asarray(im_s, dtype='float32')) # difference between shadow image and shadow_free image
+    L = threshold_otsu(diff)
+    mask = torch.tensor((np.float32(diff >= L)-0.5)/0.5).unsqueeze(0).unsqueeze(0).cuda() #-1.0:non-shadow, 1.0:shadow
+    mask.requires_grad = False
 
-	return mask
+    return mask
 
-def mod_to_pil(tensor):
+def mod_to_pil(tensor, isHyper=False):
+
+    if not isHyper:
+        img = 0.5 * (tensor.detach().data + 1.0)
+        return (to_pil(img.data.squeeze(0).cpu()))
+    else:
+        img = 0.5 * (tensor.detach().data + 1.0)
+        tensor_permuted = img.data.squeeze(0).cpu().permute(1,2,0)
+        arr = tensor_permuted.numpy()
+
+        red = normalize_band(arr[:, :, HyperConstants.RED_BAND])
+        green = normalize_band(arr[:, :, HyperConstants.GREEN_BAND])
+        blue = normalize_band(arr[:, :, HyperConstants.BLUE_BAND])
+        rgb_image = np.dstack((red, green, blue))
+
+        return (to_pil(rgb_image))
+
+def tensor2spectral(tensor, x, y):
+    
+    arr_list = []
+
     img = 0.5 * (tensor.detach().data + 1.0)
-    return (to_pil(img.data.squeeze(0).cpu()))
+    tensor_permuted = img.data.squeeze(0).cpu().permute(1,2,0)
+    arr = tensor_permuted.numpy()
+
+    for i in range(arr.shape[2]):
+        twoD = normalize_band(arr[:, :, i])
+        arr_list.append(twoD)
+    
+    image = np.dstack(arr_list)
+    #print(image.shape)
+    return image[x, y, :]
 
 def tensor2image(tensor):
     image = 127.5*(tensor[0].cpu().float().numpy() + 1.0)
@@ -120,6 +149,8 @@ def tensor2image(tensor):
         image = np.tile(image, (3,1,1))
     return image.astype(np.uint8)
 
+def normalize_band(band):
+    return ((band - band.min()) / (band.max() - band.min()) * 255).astype(np.uint8)
 # class Logger():
 #     def __init__(self, n_epochs, batches_epoch, server='http://137.189.90.150', http_proxy_host='http://proxy.cse.cuhk.edu.hk/', env = 'main'):
 #         self.viz = Visdom(server = server, http_proxy_host = http_proxy_host, env = env)#, http_proxy_port='http://proxy.cse.cuhk.edu.hk:8000/')
