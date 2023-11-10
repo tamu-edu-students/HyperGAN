@@ -78,7 +78,9 @@ RUN cd cuvis.sdk/Python/src && python3.9 -m pip install  --editable .   && \
     python3.9 -m pip install spectral &&\
     python3.9 -m pip install rasterio && \
     python3.9 -m pip install scikit-image &&\
-    python3.9 -m pip install scikit-learn
+    python3.9 -m pip install scikit-learn &&\ 
+    python3.9 -m pip install Flask
+
 
 WORKDIR /home
 

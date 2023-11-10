@@ -11,7 +11,7 @@
              datasets_dir: datasets                      
               epoch_count: 200                           	[default: 1]
               epoch_decay: 100                           
-                   epochs: 200                           
+                   epochs: 1000                          
                   gpu_ids: 0                             
     gradient_penalty_mode: none                          
   gradient_penalty_weight: 10.0                          
@@ -27,7 +27,7 @@
                 output_nc: 3                             
                     phase: test                          
                 pool_size: 50                            
-                  restore: False                         
+                  restore: True                          	[default: False]
               results_dir: samples_testing               
                    suffix:                               
 ----------------- End -------------------

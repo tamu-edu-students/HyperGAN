@@ -290,7 +290,12 @@ class MaskShadowGANModel(BaseModel):
         if self.isTrain:
             output_image.save(py.join(self.sample_dir, 'epoch-{}-iter-{}.jpg'.format(epoch, epoch_iter)))
         else:
-            output_image.save(py.join(self.sample_dir, 'img-{}.jpg'.format(epoch_iter)))
+
+            sample_save = py.join(self.sample_dir, 'img-{}.jpg'.format(epoch_iter))
+            output_image.save(sample_save)
+            with open(py.join(self.sample_dir, 'new_image.txt'), 'w') as file:
+                file.write('ready')
+
 
     def expand_dataset(self):
 
