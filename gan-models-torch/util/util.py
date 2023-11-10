@@ -73,7 +73,7 @@ def mkdir(path):
 
 
 to_pil = transforms.ToPILImage()
-to_gray = transforms.Grayscale(num_output_channels=1)
+rgb_to_gray = transforms.Grayscale(num_output_channels=1)
 
 class QueueMask():
     def __init__(self, length):
@@ -98,10 +98,13 @@ class QueueMask():
 
 def mask_generator(shadow, shadow_free, isHyper=False):
     
-    im_f = to_gray(mod_to_pil(shadow_free, isHyper))
-    im_s = to_gray(mod_to_pil(shadow, isHyper))
-	# im_f = to_gray(to_pil(((shadow_free.data.squeeze(0) + 1.0) * 0.5).cpu()))
-	# im_s = to_gray(to_pil(((shadow.data.squeeze(0) + 1.0) * 0.5).cpu()))
+    if isHyper:
+
+        im_f = hyper_to_gray(shadow_free)
+        im_s = hyper_to_gray(shadow)
+    else:
+        im_f = rgb_to_gray(mod_to_pil(shadow_free, isHyper))
+        im_s = rgb_to_gray(mod_to_pil(shadow, isHyper))
 
     diff = (np.asarray(im_f, dtype='float32')- np.asarray(im_s, dtype='float32')) # difference between shadow image and shadow_free image
     L = threshold_otsu(diff)
@@ -151,67 +154,13 @@ def tensor2image(tensor):
 
 def normalize_band(band):
     return ((band - band.min()) / (band.max() - band.min()) * 255).astype(np.uint8)
-# class Logger():
-#     def __init__(self, n_epochs, batches_epoch, server='http://137.189.90.150', http_proxy_host='http://proxy.cse.cuhk.edu.hk/', env = 'main'):
-#         self.viz = Visdom(server = server, http_proxy_host = http_proxy_host, env = env)#, http_proxy_port='http://proxy.cse.cuhk.edu.hk:8000/')
-#         self.n_epochs = n_epochs
-#         self.batches_epoch = batches_epoch
-#         self.epoch = 1
-#         self.batch = 1
-#         self.prev_time = time.time()
-#         self.mean_period = 0
-#         self.losses = {}
-#         self.loss_windows = {}
-#         self.image_windows = {}
-#
-#
-#     def log(self, losses=None, images=None):
-#         self.mean_period += (time.time() - self.prev_time)
-#         self.prev_time = time.time()
-#
-#         sys.stdout.write('\rEpoch %03d/%03d [%04d/%04d] -- ' % (self.epoch, self.n_epochs, self.batch, self.batches_epoch))
-#
-#         for i, loss_name in enumerate(losses.keys()):
-#             if loss_name not in self.losses:
-#                 self.losses[loss_name] = losses[loss_name].data.item()
-#             else:
-#                 self.losses[loss_name] += losses[loss_name].data.item()
-#
-#             if (i+1) == len(losses.keys()):
-#                 sys.stdout.write('%s: %.4f -- ' % (loss_name, self.losses[loss_name]/self.batch))
-#             else:
-#                 sys.stdout.write('%s: %.4f | ' % (loss_name, self.losses[loss_name]/self.batch))
-#
-#         batches_done = self.batches_epoch*(self.epoch - 1) + self.batch
-#         batches_left = self.batches_epoch*(self.n_epochs - self.epoch) + self.batches_epoch - self.batch
-#         sys.stdout.write('ETA: %s' % (datetime.timedelta(seconds=batches_left*self.mean_period/batches_done)))
-#
-#         # Draw images
-#         for image_name, tensor in images.items():
-#             if image_name not in self.image_windows:
-#                 self.image_windows[image_name] = self.viz.image(tensor2image(tensor.data), opts={'title':image_name})
-#             else:
-#                 self.viz.image(tensor2image(tensor.data), win=self.image_windows[image_name], opts={'title':image_name})
-#
-#         # End of epoch
-#         if (self.batch % self.batches_epoch) == 0:
-#             # Plot losses
-#             for loss_name, loss in self.losses.items():
-#                 if loss_name not in self.loss_windows:
-#                     self.loss_windows[loss_name] = self.viz.line(X=np.array([self.epoch]), Y=np.array([loss/self.batch]),
-#                                                                     opts={'xlabel': 'epochs', 'ylabel': loss_name, 'title': loss_name})
-#                 else:
-#                     self.viz.line(X=np.array([self.epoch]), Y=np.array([loss/self.batch]), win=self.loss_windows[loss_name], update='append')
-#                 # Reset losses for next epoch
-#                 self.losses[loss_name] = 0.0
-#
-#             self.epoch += 1
-#             self.batch = 1
-#             sys.stdout.write('\n')
-#         else:
-#             self.batch += 1
-#
-#
+
+def hyper_to_gray(tensor):
+    img = 0.5 * (tensor.detach().data + 1.0)
+    tensor_permuted = img.data.squeeze(0).cpu().permute(1,2,0)
+    arr = tensor_permuted.numpy()
+
+    return np.mean(arr, axis=2)
 
 class ReplayBuffer():
     def __init__(self, max_size=50):

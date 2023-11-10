@@ -84,6 +84,7 @@ if __name__ == '__main__':
 
             if total_iters % 15 == 0:
                 model.get_visuals(epoch_iter, epoch)
+                model.gen_rec_success()
                
             iter_data_time = time.time()
             total_iters += opt.batch_size
@@ -97,7 +98,7 @@ if __name__ == '__main__':
             G_losses.append(G_loss_temp / epoch_iter)
             D_A_losses.append(D_A_loss_temp / epoch_iter)
             D_B_losses.append(D_B_loss_temp/ epoch_iter)
-            model.plot_losses(epoch, opt.save_epoch_freq, G_losses, D_A_losses, D_B_losses)
+            #model.plot_losses(epoch, opt.save_epoch_freq, G_losses, D_A_losses, D_B_losses)
             model.gen_rec_success()
             
             

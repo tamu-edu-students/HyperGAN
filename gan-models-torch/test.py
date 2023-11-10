@@ -45,6 +45,9 @@ if __name__ == '__main__':
         
         model.forward()
         model.get_visuals(iters)
+
+        if iters == 200:
+            break
     #model.expand_dataset()
 
 
