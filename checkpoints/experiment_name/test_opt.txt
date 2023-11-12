@@ -7,7 +7,7 @@
                 crop_size: 256                           
                      cuda: False                         
         cycle_loss_weight: 10.0                          
-                 dataroot: shadow_USR                    	[default: None]
+                 dataroot: export_3                      	[default: None]
              datasets_dir: datasets                      
               epoch_count: 200                           	[default: 1]
               epoch_decay: 100                           

@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import io
 from PIL import Image
+import csv
 
 class BaseModel(ABC):
     """This class is an abstract base class (ABC) for models.
@@ -55,6 +56,10 @@ class BaseModel(ABC):
         Parameters:
             opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
+        self.G_losses = []
+        self.D_A_losses = []
+        self.D_B_losses = []
+
         if opt.restore or not self.isTrain:
             print('resume training, or starting testing...')
             epoch_dir = py.join(self.checkpoint_dir, 'epoch_{}'.format(opt.epoch_count))
@@ -63,7 +68,7 @@ class BaseModel(ABC):
                 save_path = py.join(epoch_dir, save_filename)
                 net = getattr(self, name)
   
-                print("loading from/ ", save_path)
+                print("loading from: ", save_path)
                 net.load_state_dict(torch.load(save_path))
             
             for optimizer in self.optimizers:
@@ -82,10 +87,24 @@ class BaseModel(ABC):
 
                 print("loading from: ", save_path)
                 lr.load_state_dict(torch.load(save_path))
+
+            with open(py.join(epoch_dir, "losses_epoch_{}.csv".format(opt.epoch_count)), 'r') as file:
+                csv_reader = csv.reader(file)
+                        
+                for row in csv_reader:
+                    print(row)
+                    # Assuming the order in the CSV file is the same as when writing
+                    element1, element2, element3 = row
+                    self.G_losses.append(element1)
+                    self.D_A_losses.append(element2)
+                    self.D_B_losses.append(element3)
             
             opt.epoch_count += 1 # updating to progress to new epoch
+            print("returningggg")
+        return self.G_losses, self.D_A_losses, self.D_B_losses  
+        
     
-    def save_networks(self, epoch, losses, opt):
+    def save_networks(self, epoch, G_losses, D_A_losses, D_B_losses, opt):
         """Save all the networks to the disk.
 
         Parameters:
@@ -118,9 +137,12 @@ class BaseModel(ABC):
             print("saving to, ", save_path)
             torch.save(lr.state_dict(), save_path)
 
-        ordered_dict_str = '\n'.join([f'{key}: {value}' for key, value in losses.items()])
-        with open(py.join(epoch_dir, "losses_epoch_{}.txt".format(epoch)), 'w') as file:
-            file.write(ordered_dict_str)
+        rows = zip(G_losses, D_A_losses, D_B_losses)
+
+        with open(py.join(epoch_dir, "losses_epoch_{}.csv".format(epoch)), 'w', newline='') as file:
+            csv_writer = csv.writer(file)
+            csv_writer.writerows(rows)
+
     
     @staticmethod
     def modify_commandline_options(parser, is_train):
@@ -179,7 +201,7 @@ class BaseModel(ABC):
     def plot_losses(self, epoch, save_freq, errors_G, errors_D_A, errors_D_B):
 
         plt.clf()
-        band_numbers = np.arange(1, epoch+1, save_freq)
+        band_numbers = np.arange(1, len(errors_G)+1, save_freq)
         plt.plot(band_numbers, errors_G,  label='Generator Loss')
         plt.plot(band_numbers, errors_D_A, label='Discriminator Loss: Shadow')
         plt.plot(band_numbers, errors_D_B, label='Discriminator Loss: Nonshadow')
