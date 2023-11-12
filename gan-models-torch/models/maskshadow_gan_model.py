@@ -293,8 +293,7 @@ class MaskShadowGANModel(BaseModel):
 
             sample_save = py.join(self.sample_dir, 'img-{}.jpg'.format(epoch_iter))
             output_image.save(sample_save)
-            with open(py.join(self.sample_dir, 'new_image.txt'), 'w') as file:
-                file.write('ready')
+            return output_image
 
 
     def expand_dataset(self):

@@ -2,7 +2,7 @@ import glob
 import random
 import os
 import torch
-from hyperspectral.util import processor
+from hyperspectral import processor
 from .base_dataset import BaseImageDataset
 from PIL import Image
 import torchvision.transforms as transforms
