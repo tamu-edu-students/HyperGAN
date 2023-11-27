@@ -7,10 +7,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import io
 from PIL import Image
+import csv
 
 class BaseModel(ABC):
     """This class is an abstract base class (ABC) for models.
-    To create a subclass, you need to implement the following five functions:
         -- <__init__>:                      initialize the class; first call BaseModel.__init__(self, opt).
         -- <set_input>:                     unpack data from dataset and apply preprocessing.
         -- <forward>:                       produce intermediate results.
@@ -50,23 +50,28 @@ class BaseModel(ABC):
         self.data_length = 0
 
     def setup(self, opt):
-        """Load and print networks; create schedulers
+        """The setup sequence is used for restoring a checkpoint from memory to continue training/testing and to bring
+        in attributes such as the saved optimizers and learning rates into the current execution
 
         Parameters:
             opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
+        self.G_losses = [] #empty losses for generators
+        self.D_A_losses = [] #for discriminator in domain A
+        self.D_B_losses = [] ##for discriminator in domain B
+
         if opt.restore or not self.isTrain:
             print('resume training, or starting testing...')
             epoch_dir = py.join(self.checkpoint_dir, 'epoch_{}'.format(opt.epoch_count))
-            for name in self.model_names:
+            for name in self.model_names: #Loading in file path of network
                 save_filename = '%s_net%s.pth' % (opt.epoch_count, name)
                 save_path = py.join(epoch_dir, save_filename)
                 net = getattr(self, name)
   
-                print("loading from/ ", save_path)
-                net.load_state_dict(torch.load(save_path))
+                print("loading from: ", save_path)
+                net.load_state_dict(torch.load(save_path)) #brings in generator by name in order to apply its restored state to current instance
             
-            for optimizer in self.optimizers:
+            for optimizer in self.optimizers: #Loads in optimizer in similar fashion 
                 
                 save_filename = '%s_%s.pth' % (opt.epoch_count, optimizer)
                 save_path = py.join(epoch_dir, save_filename)
@@ -75,21 +80,36 @@ class BaseModel(ABC):
                 print("loading from: ", save_path)
                 optimizer.load_state_dict(torch.load(save_path))
 
-            for lr in self.lrs:
+            for lr in self.lrs: #Same with learning rate
                 save_filename = '%s_%s.pth' % (opt.epoch_count, lr)
                 save_path = py.join(epoch_dir, save_filename)
                 lr = getattr(self, lr)
 
                 print("loading from: ", save_path)
                 lr.load_state_dict(torch.load(save_path))
+
+            with open(py.join(epoch_dir, "losses_epoch_{}.csv".format(opt.epoch_count)), 'r') as file: #routing to saved state of previous csv
+                csv_reader = csv.reader(file)
+                        
+                for row in csv_reader: #restoring losses using csv value stored from previous training session
+                    #print(row)
+                    # Assuming the order in the CSV file is the same as when writing
+                    element1, element2, element3 = row
+                    self.G_losses.append(element1)
+                    self.D_A_losses.append(element2)
+                    self.D_B_losses.append(element3)
             
             opt.epoch_count += 1 # updating to progress to new epoch
+        return self.G_losses, self.D_A_losses, self.D_B_losses  #returning losses
+        
     
-    def save_networks(self, epoch, losses, opt):
-        """Save all the networks to the disk.
+    def save_networks(self, epoch, G_losses, D_A_losses, D_B_losses, opt):
+        """Save all the networks to the disk in similar fashion to setup
 
         Parameters:
             epoch (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
+            G/D_A/D_B_losses -- losses from current training session over epochs
+            opt -- options
         """
         epoch_dir = py.join(self.checkpoint_dir, 'epoch_{}'.format(epoch))
         py.mkdir(epoch_dir)
@@ -118,9 +138,12 @@ class BaseModel(ABC):
             print("saving to, ", save_path)
             torch.save(lr.state_dict(), save_path)
 
-        ordered_dict_str = '\n'.join([f'{key}: {value}' for key, value in losses.items()])
-        with open(py.join(epoch_dir, "losses_epoch_{}.txt".format(epoch)), 'w') as file:
-            file.write(ordered_dict_str)
+        rows = zip(G_losses, D_A_losses, D_B_losses)
+
+        with open(py.join(epoch_dir, "losses_epoch_{}.csv".format(epoch)), 'w', newline='') as file:
+            csv_writer = csv.writer(file)
+            csv_writer.writerows(rows)
+
     
     @staticmethod
     def modify_commandline_options(parser, is_train):
@@ -177,13 +200,15 @@ class BaseModel(ABC):
         return errors_ret
     
     def plot_losses(self, epoch, save_freq, errors_G, errors_D_A, errors_D_B):
-
+        """
+        Plots the losses in the same directory as the epoch checkpoint in order to provide a visualizer 
+        """
         plt.clf()
-        band_numbers = np.arange(1, epoch+1, save_freq)
-        plt.plot(band_numbers, errors_G,  label='Generator Loss')
-        plt.plot(band_numbers, errors_D_A, label='Discriminator Loss: Shadow')
-        plt.plot(band_numbers, errors_D_B, label='Discriminator Loss: Nonshadow')
-        plt.xlabel('Epoch')
+        tot_epochs = np.arange(1, len(errors_G)+1, save_freq) #creating x axis for plot
+        plt.plot(tot_epochs, errors_G,  label='Generator Loss') #plotting loss components over the amount of epochs trainined for each network
+        plt.plot(tot_epochs, errors_D_A, label='Discriminator Loss: Shadow')
+        plt.plot(tot_epochs, errors_D_B, label='Discriminator Loss: Nonshadow')
+        plt.xlabel('Epoch') #labeling the plot
         plt.ylabel('Loss Value')
         plt.title('Loss for Subnet Over Epochs')
         plt.legend()

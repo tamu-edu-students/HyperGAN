@@ -5,28 +5,29 @@ from models import networks, create_model
 from models import create_model
 import pylib as py
 import numpy as np
-import imlib as im
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from PIL import Image
 import tqdm
-import spectral
 from dataset.maskshadow_dataset import MaskImageDataset
-import functools
+import queue
 import torchvision.transforms as transforms
+from io import BytesIO
+import warnings
+import rasterio
 
 if __name__ == '__main__':
-    
+    warnings.filterwarnings("ignore", message="Using a target size .* that is different to the input size .*")
+    warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
     opt = TestOptions().parse()
 
-    transforms_ = [#transforms.Resize((opt.size, opt.size), Image.BICUBIC),
-    transforms.Resize(int(opt.crop_size * 1.12), Image.Resampling.BICUBIC),
-    transforms.RandomCrop(opt.crop_size),
-    transforms.RandomHorizontalFlip(),
+    transforms_ = [transforms.Resize((opt.crop_size, opt.crop_size), Image.BICUBIC),
+    # transforms.Resize(int(opt.crop_size * 1.12), Image.Resampling.BICUBIC),
+    # transforms.RandomCrop(opt.crop_size),
     transforms.ToTensor(),
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
     dataloader = DataLoader(MaskImageDataset(opt.datasets_dir, opt.dataroot, transforms_=transforms_, unaligned=True, mode='test'),
-                batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
+                batch_size=opt.batch_size, shuffle=opt.shuffle, num_workers=opt.n_cpu)
     
     model = create_model(opt)
     model.data_length = len(dataloader.dataset)
@@ -45,7 +46,10 @@ if __name__ == '__main__':
         
         model.forward()
         model.get_visuals(iters)
-    #model.expand_dataset()
+
+        # if iters == 200:
+        #     break
+    model.expand_dataset() if opt.expand_dataset else None
 
 
 

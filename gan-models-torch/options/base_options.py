@@ -56,10 +56,7 @@ class BaseOptions():
         model_option_setter = models.get_option_setter(model_name)
         parser = model_option_setter(parser, self.isTrain)
         # modify dataset-related parser options
-       # dataset_name = opt.dataset_mode
-        #dataset_option_setter = data.get_option_setter(dataset_name)
-        #parser = dataset_option_setter(parser, self.isTrain)
-
+       
         # save and return the parser
         self.parser = parser
         return parser.parse_args()
@@ -101,16 +98,6 @@ class BaseOptions():
             opt.name = opt.name + suffix
 
         self.print_options(opt)
-
-        # # set gpu ids
-        # str_ids = opt.gpu_ids.split(',')
-        # opt.gpu_ids = []
-        # for str_id in str_ids:
-        #     id = int(str_id)
-        #     if id >= 0:
-        #         opt.gpu_ids.append(id)
-        # if len(opt.gpu_ids) > 0:
-        #     torch.cuda.set_device(opt.gpu_ids[0])
 
         self.opt = opt
         return self.opt

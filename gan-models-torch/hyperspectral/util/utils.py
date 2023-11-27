@@ -23,8 +23,8 @@ def spectral_plot(gt_band_values, orig_band_values, rec_band_values, associated_
     RMSE_orig = mean_squared_error(gt_band_values, orig_band_values)
     RMSE_rec = mean_squared_error(gt_band_values, rec_band_values)
 
-    plt.text(20, 4, 'RMSE: GT and Original' + f"{RMSE_orig:.3f}", fontsize=8, color='red', ha='center')
-    plt.text(20, 8, 'RMSE: GT and Reconstructed' + f"{RMSE_rec:.3f}", fontsize=8, color='blue', ha='center')
+   # plt.text(20, 4, 'RMSE: GT and Original' + f"{RMSE_orig:.3f}", fontsize=8, color='red', ha='center')
+   # plt.text(20, 8, 'RMSE: GT and Reconstructed' + f"{RMSE_rec:.3f}", fontsize=8, color='blue', ha='center')
 
     buffer = io.BytesIO()
 
@@ -45,3 +45,6 @@ def highlight_selector(shadowed, deshadowed):
     mask = np.float32(diff >= L)
 
     print(max(mask), "amd", min(mask))
+
+def hyper_to_gray():
+    pass

@@ -5,59 +5,62 @@ from models import networks, create_model
 from models import create_model
 import pylib as py
 import numpy as np
-import imlib as im
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from PIL import Image
 import tqdm
 from dataset.hyperspectral_dataset import HyperspectralImageDataset
+from dataset.maskshadow_dataset import MaskImageDataset 
 import functools
 import torchvision.transforms as transforms
+import warnings
+import torch
+import rasterio
 
 if __name__ == '__main__':
-    
+    warnings.filterwarnings("ignore", message="Using a target size .* that is different to the input size .*")
+    warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
+
     opt = TrainOptions().parse()
 
-    # transforms_ = [#transforms.Resize((opt.size, opt.size), Image.BICUBIC),
-    #     transforms.Resize(int(opt.crop_size * 1.12), Image.Resampling.BICUBIC),
-    #     transforms.RandomCrop(opt.crop_size),
-    #     transforms.RandomHorizontalFlip(),
-    #     transforms.ToTensor(),
-    #     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
-
-    mean_values = np.array([0.5] * opt.input_nc)  # input_nc channels with a mean of 0.5
-    std_values = np.array([0.5] * opt.input_nc)   # input_nc channels with a standard deviation of 0.5
-
-    transforms_ = [
-        #transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize(mean_values.tolist(), std_values.tolist())
-        ]
-    
-    # dataloader = DataLoader(MaskImageDataset(opt.datasets_dir, opt.dataroot, transforms_=transforms_, unaligned=True, mode='train'),
-    #             batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
-    dataloader = DataLoader(HyperspectralImageDataset(opt.datasets_dir, opt.dataroot, True, transforms_=transforms_, unaligned=True, mode='train'),
+    if opt.input_nc == 3:
+        transforms_ = [#transforms.Resize((opt.size, opt.size), Image.BICUBIC),
+            transforms.Resize(int(opt.crop_size * 1.12), Image.Resampling.BICUBIC),
+            transforms.RandomCrop(opt.crop_size),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+        dataloader = DataLoader(MaskImageDataset(opt.datasets_dir, opt.dataroot, transforms_=transforms_, unaligned=True, mode='train'),
                 batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
-   
+    else:
+        mean_values = np.array([0.5] * opt.input_nc)  # input_nc channels with a mean of 0.5
+        std_values = np.array([0.5] * opt.input_nc)   # input_nc channels with a standard deviation of 0.5
+
+        transforms_ = [
+            #transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean_values.tolist(), std_values.tolist())
+            ]
+        
+        dataloader = DataLoader(HyperspectralImageDataset(opt.datasets_dir, opt.dataroot, True, transforms_=transforms_, unaligned=True, mode='train'),
+                    batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
+    
+    
     model = create_model(opt)
+
     model.data_length = len(dataloader.dataset)
     model.setup(opt)
     
 
+    G_losses, D_A_losses, D_B_losses = model.G_losses, model.D_A_losses, model.D_B_losses
     plt.ioff()
     curr_iter = 0
-    G_losses = []
-    D_A_losses = []
-    D_B_losses = []
     to_pil = transforms.ToPILImage()
     total_iters = 0
-
-    
     
     py.mkdir(model.output_dir)
     py.mkdir(model.sample_dir)
     py.mkdir(model.checkpoint_dir)
-
 
     for epoch in tqdm.trange(opt.epoch_count, opt.epochs, desc='Epoch Loop'):
 
@@ -82,8 +85,9 @@ if __name__ == '__main__':
             D_A_loss_temp += losses_temp["D_A"]
             D_B_loss_temp += losses_temp["D_B"]
 
-            if total_iters % 15 == 0:
+            if total_iters % 100 == 0:
                 model.get_visuals(epoch_iter, epoch)
+                # model.gen_rec_success()
                
             iter_data_time = time.time()
             total_iters += opt.batch_size
@@ -93,11 +97,11 @@ if __name__ == '__main__':
 
         if epoch % opt.save_epoch_freq == 0:              # cache our model every <save_epoch_freq> epochs
             print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
-            model.save_networks(epoch, losses_temp, opt)
             G_losses.append(G_loss_temp / epoch_iter)
             D_A_losses.append(D_A_loss_temp / epoch_iter)
-            D_B_losses.append(D_B_loss_temp/ epoch_iter)
+            D_B_losses.append(D_B_loss_temp / epoch_iter)
+            model.save_networks(epoch, G_losses, D_A_losses, D_B_losses, opt)
             model.plot_losses(epoch, opt.save_epoch_freq, G_losses, D_A_losses, D_B_losses)
-            model.gen_rec_success()
+            model.gen_rec_success(epoch)
             
             
