@@ -7,11 +7,12 @@
                 crop_size: 256                           
                      cuda: False                         
         cycle_loss_weight: 10.0                          
-                 dataroot: export_3                      	[default: None]
+                 dataroot: hsi_real_time                 	[default: None]
              datasets_dir: datasets                      
-              epoch_count: 200                           	[default: 1]
+              epoch_count: 410                           	[default: 1]
               epoch_decay: 100                           
                    epochs: 1000                          
+           expand_dataset: False                         
                   gpu_ids: 0                             
     gradient_penalty_mode: none                          
   gradient_penalty_weight: 10.0                          
@@ -27,7 +28,8 @@
                 output_nc: 3                             
                     phase: test                          
                 pool_size: 50                            
-                  restore: True                          	[default: False]
+                  restore: False                         
               results_dir: samples_testing               
+                  shuffle: False                         
                    suffix:                               
 ----------------- End -------------------

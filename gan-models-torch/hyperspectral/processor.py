@@ -11,6 +11,11 @@ import cv2
 import cuvis
 
 class Processor:
+
+    """
+    This class serves functionality in regards to hyperspectral image processing through preparing data for tensor generation 
+    This class also provides provides additional functions such as a False RGB, array generation and band display  
+    """
     def __init__(self, hsi_data=None, user_settings=None) -> None:
         self.hsi_data = hsi_data
         self.user_settings = user_settings
@@ -19,7 +24,7 @@ class Processor:
         self.bands = 0
 
     def prepare_data(self, img_path):
-        if img_path[-3:] == 'mat':
+        if img_path[-3:] == 'mat': #processing for matlab file
             img_mat = sio.loadmat(img_path)
             img_keys = img_mat.keys()
             img_key = [k for k in img_keys if k != '__version__' and k != '__header__' and k != '__globals__']
@@ -35,13 +40,12 @@ class Processor:
             self.hsi_data = self.hyperCrop(self.hsi_data, 256)
             self.bands, self.rows, self.cols = self.hsi_data.shape
            
-            #print("bands: ", self.bands, " rows: ", self.rows, " cols: ", self.cols)
-        
-        if img_path.find('cu3') != -1:
+           
+        if img_path.find('cu3') != -1: #open file if in cubert format
 
-            mesu = cuvis.Measurement(img_path)
-            self.hsi_data = mesu.Data.pop("cube", None)
-            self.rows, self.cols, self.bands = self.hsi_data.array.shape
+            mesu = cuvis.Measurement(img_path) #create measurement
+            self.hsi_data = mesu.Data.pop("cube", None) #pop cube
+            self.rows, self.cols, self.bands = self.hsi_data.array.shape #set dimensions
             print("bands: ", self.bands, " rows: ", self.rows, " cols: ", self.cols)
 
         if img_path.find('hdr') != -1:
@@ -51,27 +55,27 @@ class Processor:
             # Generate random noise in the range [0, 1]
             
             img_path_data = img_path[:-4]
-            img = envi.open(img_path, img_path_data)
+            img = envi.open(img_path, img_path_data) #use envi for hdr files with metadata
             arr = img.load()
             print(arr.info())
             self.hsi_data = arr
             
 
-        return self.hsi_data
+        return self.hsi_data #returns data
 
     def hyperCrop(self, arr, target_dim):
 
-        target_shape = (target_dim, target_dim)
-        rec_array = np.empty((target_dim, target_dim, arr.shape[2]), dtype=np.float32)
+        target_shape = (target_dim, target_dim) #input crop sizes
+        rec_array = np.empty((target_dim, target_dim, arr.shape[2]), dtype=np.float32) #empty 3D array
         arr_list = []
 
-        for i in range(arr.shape[2]):
-            twoD = arr[:,:,i]
-            zoom_factors = (target_shape[0] / twoD.shape[0], target_shape[1] / twoD.shape[1])
-            resized_array = zoom(twoD, zoom_factors)
+        for i in range(arr.shape[2]): #iterating through dimensions for cropping
+            twoD = arr[:,:,i] #capturing 2D array at each dimension
+            zoom_factors = (target_shape[0] / twoD.shape[0], target_shape[1] / twoD.shape[1]) #creating zoom factor by comparing dimensions
+            resized_array = zoom(twoD, zoom_factors) #using scipy function for zoom
             arr_list.append(resized_array)
         
-        return np.dstack(arr_list)
+        return np.dstack(arr_list) #stacking dimensions for output
 
 
     def convertMat(self, data):
@@ -102,32 +106,33 @@ class Processor:
         
         bands, height, width = self.hsi_data.shape
 
-        red_band_norm = self.normalize_band(self.hsi_data[band_red, :, ])
-        green_band_norm = self.normalize_band(self.hsi_data[band_green, :, :])
-        blue_band_norm = self.normalize_band(self.hsi_data[band_blue, :, :])
-        rgb_image = np.dstack((red_band_norm, green_band_norm, blue_band_norm))
+        red_band_norm = self.normalize_band(self.hsi_data[:, :, band_red]) #normalizing values of red band
+        green_band_norm = self.normalize_band(self.hsi_data[:, :, band_green]) #normalizing values of green band
+        blue_band_norm = self.normalize_band(self.hsi_data[:, :, band_blue]) #normalizing values of blue band
+        rgb_image = np.dstack((red_band_norm, green_band_norm, blue_band_norm)) #stacking three dimensions for false RGB output
         rgb_image = np.uint8(rgb_image)
+        
         
         plt.imshow(rgb_image) if visualize else None
         plt.show() if visualize else None
 
         if convertPIL:
-            return Image.fromarray(rgb_image)
+            return Image.fromarray(rgb_image) #convert to PIL image if desired
         else:
             return rgb_image
         
     def genArray(self):
         
-        bands, height, width = self.hsi_data.shape
+        bands, height, width = self.hsi_data.shape #capturing dimensions of measurement
         arr_list = []
         for i in range(bands):
-            arr_list.append(self.normalize_band(self.hsi_data[i, :, :]))
+            arr_list.append(self.normalize_band(self.hsi_data[i, :, :])) #creating numpy array after normalizing data
 
         return np.uint8(np.dstack(arr_list))
 
 
     def normalize_band(self, band):
-        return ((band - band.min()) / (band.max() - band.min()) * 255).astype(np.uint8)
+        return ((band - band.min()) / (band.max() - band.min()) * 255).astype(np.uint8) #normalizing data from band to uint8 format
 
 
 

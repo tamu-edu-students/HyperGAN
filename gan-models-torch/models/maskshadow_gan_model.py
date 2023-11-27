@@ -9,7 +9,7 @@ import pylib as py
 import functools
 from PIL import Image
 from util.util import LambdaLR, weights_init_normal, ReplayBuffer, QueueMask, mask_generator, mod_to_pil
-
+from hyperspectral.util.eval_metrics import mean_squared_error 
 
 class MaskShadowGANModel(BaseModel):
     """
@@ -24,76 +24,76 @@ class MaskShadowGANModel(BaseModel):
     """
     
     def __init__(self, opt):
-        BaseModel.__init__(self, opt)
-        self.loss_names = ['D_A', 'G_A2B', 'cycle_ABA', 'idt_A', 'D_B', 'G_B2A', 'cycle_BAB', 'idt_B']
-        self.create_networks(opt)
+        BaseModel.__init__(self, opt) #calling constructor of super class
+        self.loss_names = ['D_A', 'G_A2B', 'cycle_ABA', 'idt_A', 'D_B', 'G_B2A', 'cycle_BAB', 'idt_B'] #setting up loss names
+        self.create_networks(opt) #creating networks upon startup
 
     def setup(self, opt):
         super().setup(opt)
 
-        self.mask_queue =  QueueMask(self.data_length/4)
-        print(self.data_length/4)
+        self.mask_queue =  QueueMask(self.data_length/4) #Queue for storing masks with finite storage to prioritize mask generation improvement 
+        print(self.data_length/4) #printing the length
 
     def create_networks(self, opt):
         
         if self.isTrain:
-            self.model_names = ['G_A2B', 'G_B2A', 'D_A', 'D_B']
-            self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc)
+            self.model_names = ['G_A2B', 'G_B2A', 'D_A', 'D_B'] #initializing generator and discriminator list for getattr()
+            self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc) #initializing subnets for image to image translation
             self.G_B2A = networks.Generator_F2S(opt.output_nc, opt.input_nc)
             self.D_A = networks.Discriminator(opt.input_nc)
             self.D_B = networks.Discriminator(opt.output_nc)
 
-            if opt.cuda:
+            if opt.cuda: #detecting GPU on runtime for models to be evaluated using GPU compute
                 print("Using GPU")
                 self.G_A2B.cuda()
                 self.G_B2A.cuda()
                 self.D_A.cuda()
                 self.D_B.cuda()
             
-            self.G_A2B.apply(weights_init_normal)
+            self.G_A2B.apply(weights_init_normal) #initializing baseline weights
             self.G_B2A.apply(weights_init_normal)
             self.D_A.apply(weights_init_normal)
             self.D_B.apply(weights_init_normal)
 
             
             self.criterionGAN = torch.nn.MSELoss()  # define GAN loss.
-            self.criterionCycle = torch.nn.L1Loss()
-            self.criterionIdentity = torch.nn.L1Loss()
+            self.criterionCycle = torch.nn.L1Loss() #cyclic loss after passing through both generators
+            self.criterionIdentity = torch.nn.L1Loss() #identity loss for using wrong generator on image from another domain
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             self.optimizer_G = torch.optim.Adam(itertools.chain(self.G_A2B.parameters(), self.G_B2A.parameters()), lr=opt.lr, betas=(opt.beta_1, 0.999))
             self.optimizer_D_A = torch.optim.Adam(self.D_A.parameters(), lr=opt.lr, betas=(0.5, 0.999))
             self.optimizer_D_B = torch.optim.Adam(self.D_B.parameters(), lr=opt.lr, betas=(0.5, 0.999))
             self.optimizers.append('optimizer_G')
-            self.optimizers.append('optimizer_D_A')
-            self.optimizers.append('optimizer_D_B')
+            self.optimizers.append('optimizer_D_A') #appending optimizers by name for saving and loading
+            self.optimizers.append('optimizer_D_B')  #getattr() will be called to reference the object
             self.lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(self.optimizer_G,
 												   lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step)
             self.lr_scheduler_D_A = torch.optim.lr_scheduler.LambdaLR(self.optimizer_D_A,
 													 lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step)
             self.lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(self.optimizer_D_B,
 													 lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step)
-            self.lrs.append('lr_scheduler_G')
-            self.lrs.append('lr_scheduler_D_A')
+            self.lrs.append('lr_scheduler_G')  #appending learning rate schedulars by name for saving and loading
+            self.lrs.append('lr_scheduler_D_A')#getattr() will be called to reference the object
             self.lrs.append('lr_scheduler_D_B')
             
         else:  # during test time, only load Gs
-            self.model_names = ['G_A2B', 'G_B2A']
+            self.model_names = ['G_A2B', 'G_B2A'] #for testing, only generators are required
             self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc)
             self.G_B2A = networks.Generator_F2S(opt.output_nc, opt.input_nc)
 
             if opt.cuda:
                 print("Using GPU")
                 self.G_A2B.cuda()
-                self.G_B2A.cuda()
-
-            self.G_A2B.apply(weights_init_normal)
+                self.G_B2A.cuda() #transferring computation to GPU
+ 
+            self.G_A2B.apply(weights_init_normal) #initializing normal weights
             self.G_B2A.apply(weights_init_normal)
         
-        Tensor = torch.cuda.FloatTensor if opt.cuda else torch.Tensor
-        self.input_A = Tensor(opt.batch_size, opt.input_nc, opt.crop_size, opt.crop_size)
-        self.input_B = Tensor(opt.batch_size, opt.output_nc, opt.crop_size, opt.crop_size)
-        self.target_real = torch.autograd.Variable(Tensor(opt.batch_size).fill_(1.0), requires_grad=False)
-        self.target_fake = torch.autograd.Variable(Tensor(opt.batch_size).fill_(0.0), requires_grad=False)
+        Tensor = torch.cuda.FloatTensor if opt.cuda else torch.Tensor  #Using float tensor given GPU resource
+        self.input_A = Tensor(opt.batch_size, opt.input_nc, opt.crop_size, opt.crop_size) #input tensor for data unpacking - Domain A
+        self.input_B = Tensor(opt.batch_size, opt.output_nc, opt.crop_size, opt.crop_size) #input tensor for data unpacking - Domain B
+        self.target_real = torch.autograd.Variable(Tensor(opt.batch_size).fill_(1.0), requires_grad=False) # tensor for a real decision - all 1s 
+        self.target_fake = torch.autograd.Variable(Tensor(opt.batch_size).fill_(0.0), requires_grad=False) # tensor for a fake decision - all 0s
         self.mask_non_shadow = torch.autograd.Variable(Tensor(opt.batch_size, 1, opt.crop_size, opt.crop_size).fill_(-1.0), requires_grad=False) #-1.0 non-shadow
 
         self.fake_A_buffer = ReplayBuffer()
@@ -153,14 +153,14 @@ class MaskShadowGANModel(BaseModel):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         self.fake_B = self.G_A2B(self.real_A)  # G_A(A)
 
-        self.computed_mask = mask_generator(self.real_A, self.fake_B)
-        self.mask_queue.insert(self.computed_mask)
+        self.computed_mask = mask_generator(self.real_A, self.fake_B) #processing tensors for mask generation via thresholding
+        self.mask_queue.insert(self.computed_mask) #inserting generated mask into queue
 
         
         self.rec_A = self.G_B2A(self.fake_B, self.mask_queue.last_item())   # G_B(G_A(A))
         
 
-        self.rand_guide_mask = self.mask_queue.rand_item()
+        self.rand_guide_mask = self.mask_queue.rand_item() #using random mask from queue for guidance
         self.fake_A = self.G_B2A(self.real_B, self.rand_guide_mask)  # G_B(B)
         
         self.rec_B = self.G_A2B(self.fake_A)   # G_A(G_B(B))
@@ -256,62 +256,62 @@ class MaskShadowGANModel(BaseModel):
         num_columns = 0
 
         if self.isTrain:
-            images.append(mod_to_pil(self.real_A))
-            images.append(mod_to_pil(self.fake_B))
-            images.append(mod_to_pil(self.rec_A))
-            images.append(mod_to_pil(self.computed_mask))
-            images.append(mod_to_pil(self.real_B))
-            images.append(mod_to_pil(self.fake_A))
-            images.append(mod_to_pil(self.rec_B))
-            images.append(mod_to_pil(self.rand_guide_mask))
+            images.append(mod_to_pil(self.real_A)) # conversion of tensor to an image for real image - Domain A
+            images.append(mod_to_pil(self.fake_B)) # conversion of tensor to an image for generator A2_B output - Domain B
+            images.append(mod_to_pil(self.rec_A)) # conversion of tensor to an image for fake B to A output - Domain A
+            images.append(mod_to_pil(self.computed_mask)) #thresholded mask
+            images.append(mod_to_pil(self.real_B)) # conversion of tensor to an image for real image - Domain B
+            images.append(mod_to_pil(self.fake_A)) # conversion of tensor to an image for generator B2_A output - Domain A
+            images.append(mod_to_pil(self.rec_B)) # conversion of tensor to an image for fake A to B output - Domain B
+            images.append(mod_to_pil(self.rand_guide_mask)) #random mask used for shadowing
             num_rows = 2
             num_columns = 4
         else:
-            images.append(mod_to_pil(self.real_A))
+            images.append(mod_to_pil(self.real_A)) #append only A -> B transformation if not training
             images.append(mod_to_pil(self.fake_B))
             images.append(mod_to_pil(self.computed_mask))
             num_rows = 1
             num_columns = 3
-
+        #arranging images and creating boundaries
         image_width, image_height = images[0].size
         output_width = num_columns * image_width
         output_height = num_rows * image_height
 
-        output_image = Image.new('RGB', (output_width, output_height))
+        self.output_image = Image.new('RGB', (output_width, output_height))
         # Paste the individual PIL images onto the output image
         for i, image in enumerate(images):
             row = i // num_columns
             col = i % num_columns
             x_offset = col * image_width
             y_offset = row * image_height
-            output_image.paste(image, (x_offset, y_offset))
+            self.output_image.paste(image, (x_offset, y_offset))
 
         # Save the combined image as a PNG file
         if self.isTrain:
-            output_image.save(py.join(self.sample_dir, 'epoch-{}-iter-{}.jpg'.format(epoch, epoch_iter)))
+            self.output_image.save(py.join(self.sample_dir, 'epoch-{}-iter-{}.jpg'.format(epoch, epoch_iter)))
         else:
-
             sample_save = py.join(self.sample_dir, 'img-{}.jpg'.format(epoch_iter))
-            output_image.save(sample_save)
-            return output_image
+            self.output_image.save(sample_save)
+            
+            return mod_to_pil(self.real_A), mod_to_pil(self.fake_B)
 
 
     def expand_dataset(self):
 
         hyper_shadowed = []
 
-        for i in range(int(self.data_length/4)):
-            self.rand_guide_mask = self.mask_queue.rand_item()
-            self.fake_A = self.G_B2A(self.real_B, self.rand_guide_mask)  # G_B(B)
+        for i in range(int(self.data_length/4)): #iterating through queue
+            self.rand_guide_mask = self.mask_queue.rand_item() #selecting random mask
+            self.fake_A = self.G_B2A(self.real_B, self.rand_guide_mask)  # G_B(B) using sampled mask
             print(i)
-            images = []
+            images = [] #apending results
             images.append(mod_to_pil(self.real_B))
             images.append(mod_to_pil(self.fake_A))
             images.append(mod_to_pil(self.rand_guide_mask))
             num_rows = 1
-            num_columns = 3
+            num_columns = 3 #arranging GT, fake shadowed A, and guidance mask
 
-            image_width, image_height = images[0].size
+            image_width, image_height = images[0].size 
             output_width = num_columns * image_width
             output_height = num_rows * image_height
 
@@ -327,6 +327,6 @@ class MaskShadowGANModel(BaseModel):
             hyper_shadowed.append(output_image)
 
         iter = 0
-        for hs in hyper_shadowed:
+        for hs in hyper_shadowed: #iterating through all sampled artificial images
             iter += 1
             hs.save(py.join(self.sample_dir, 'img-{}.jpg'.format(iter)))

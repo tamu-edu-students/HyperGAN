@@ -46,4 +46,5 @@ def highlight_selector(shadowed, deshadowed):
 
     print(max(mask), "amd", min(mask))
 
-def hyper_to_gray()
+def hyper_to_gray():
+    pass

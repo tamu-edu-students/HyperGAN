@@ -24,71 +24,76 @@ class CycleGANModel(BaseModel):
     """
 
     def __init__(self, opt):
-        BaseModel.__init__(self, opt)
-        self.loss_names = ['D_A', 'G_A2B', 'cycle_ABA', 'idt_A', 'D_B', 'G_B2A', 'cycle_BAB', 'idt_B']
-        self.create_networks(opt)
+        BaseModel.__init__(self, opt) #calling constructor of super class
+        self.loss_names = ['D_A', 'G_A2B', 'cycle_ABA', 'idt_A', 'D_B', 'G_B2A', 'cycle_BAB', 'idt_B'] #setting up loss names
+        self.create_networks(opt) #creating networks upon startup
 
 
     def create_networks(self, opt):
+
+        """This function is responsible for initializing and setting parameters for the individual subnets that will be used during training
+        It also creates optimizers and learning rate schedulers depending on the mode of operation (train/test)
         
-        if self.isTrain:
-            self.model_names = ['G_A2B', 'G_B2A', 'D_A', 'D_B']
-            self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc)
+        """
+        
+        if self.isTrain: #initializing certain networks depending on mode
+            self.model_names = ['G_A2B', 'G_B2A', 'D_A', 'D_B'] #generators and discriminators for both domain for cyclic training
+            self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc) #calling defined generator and discriminator networks for instantiation
             self.G_B2A = networks.Generator(opt.output_nc, opt.input_nc)
             self.D_A = networks.Discriminator(opt.input_nc)
             self.D_B = networks.Discriminator(opt.output_nc)
 
-            if opt.cuda:
+            if opt.cuda: #detecting GPU on runtime for models to be evaluated using GPU compute
                 print("Using GPU")
                 self.G_A2B.cuda()
                 self.G_B2A.cuda()
                 self.D_A.cuda()
                 self.D_B.cuda()
             
-            self.G_A2B.apply(weights_init_normal)
+            self.G_A2B.apply(weights_init_normal) #initializing baseline weights
             self.G_B2A.apply(weights_init_normal)
             self.D_A.apply(weights_init_normal)
             self.D_B.apply(weights_init_normal)
 
             
             self.criterionGAN = torch.nn.MSELoss()  # define GAN loss.
-            self.criterionCycle = torch.nn.L1Loss()
-            self.criterionIdentity = torch.nn.L1Loss()
+            self.criterionCycle = torch.nn.L1Loss() #cyclic loss after passing through both generators
+            self.criterionIdentity = torch.nn.L1Loss() #identity loss for using wrong generator on image from another domain
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             self.optimizer_G = torch.optim.Adam(itertools.chain(self.G_A2B.parameters(), self.G_B2A.parameters()), lr=opt.lr, betas=(opt.beta_1, 0.999))
             self.optimizer_D_A = torch.optim.Adam(self.D_A.parameters(), lr=opt.lr, betas=(0.5, 0.999))
-            self.optimizer_D_B = torch.optim.Adam(self.D_B.parameters(), lr=opt.lr, betas=(0.5, 0.999))
+            self.optimizer_D_B = torch.optim.Adam(self.D_B.parameters(), lr=opt.lr, betas=(0.5, 0.999)) #adam optimizers with preset hyperparameters
             self.optimizers.append('optimizer_G')
-            self.optimizers.append('optimizer_D_A')
-            self.optimizers.append('optimizer_D_B')
+            self.optimizers.append('optimizer_D_A') #appending optimizers by name for saving and loading
+            self.optimizers.append('optimizer_D_B') #getattr() will be called to reference the object
             self.lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(self.optimizer_G,
-												   lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step)
+												   lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step) #initializing learning rate schedulers to decay over training
             self.lr_scheduler_D_A = torch.optim.lr_scheduler.LambdaLR(self.optimizer_D_A,
 													 lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step)
             self.lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(self.optimizer_D_B,
 													 lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step)
-            self.lrs.append('lr_scheduler_G')
-            self.lrs.append('lr_scheduler_D_A')
+            self.lrs.append('lr_scheduler_G') #appending learning rate schedulars by name for saving and loading
+            self.lrs.append('lr_scheduler_D_A') #getattr() will be called to reference the object
             self.lrs.append('lr_scheduler_D_B')
             
         else:  # during test time, only load Gs
             self.model_names = ['G_A2B', 'G_B2A']
-            self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc)
+            self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc) #for testing, only generators are required
             self.G_B2A = networks.Generator(opt.output_nc, opt.input_nc)
 
             if opt.cuda:
                 print("Using GPU")
                 self.G_A2B.cuda()
-                self.G_B2A.cuda()
+                self.G_B2A.cuda() #transferring computation to GPU
 
-            self.G_A2B.apply(weights_init_normal)
+            self.G_A2B.apply(weights_init_normal) #initializing normal weights
             self.G_B2A.apply(weights_init_normal)
         
-        Tensor = torch.cuda.FloatTensor if opt.cuda else torch.Tensor
-        self.input_A = Tensor(opt.batch_size, opt.input_nc, opt.crop_size, opt.crop_size)
-        self.input_B = Tensor(opt.batch_size, opt.output_nc, opt.crop_size, opt.crop_size)
-        self.target_real = torch.autograd.Variable(Tensor(opt.batch_size).fill_(1.0), requires_grad=False)
-        self.target_fake = torch.autograd.Variable(Tensor(opt.batch_size).fill_(0.0), requires_grad=False)
+        Tensor = torch.cuda.FloatTensor if opt.cuda else torch.Tensor #Using float tensor given GPU resource
+        self.input_A = Tensor(opt.batch_size, opt.input_nc, opt.crop_size, opt.crop_size) #input tensor for data unpacking - Domain A
+        self.input_B = Tensor(opt.batch_size, opt.output_nc, opt.crop_size, opt.crop_size) #input tensor for data unpacking - Domain B
+        self.target_real = torch.autograd.Variable(Tensor(opt.batch_size).fill_(1.0), requires_grad=False) # tensor for a real decision - all 1s 
+        self.target_fake = torch.autograd.Variable(Tensor(opt.batch_size).fill_(0.0), requires_grad=False)# tensor for a fake decision - all 0s
         self.fake_A_buffer = ReplayBuffer()
         self.fake_B_buffer = ReplayBuffer()
 
@@ -109,8 +114,8 @@ class CycleGANModel(BaseModel):
         A (source domain), B (target domain).
         Generators: G_A: A -> B; G_B: B -> A.
         Discriminators: D_A: G_A(A) vs. B; D_B: G_B(B) vs. A.
-        Forward cycle loss:  lambda_A * ||G_B(G_A(A)) - A|| (Eqn. (2) in the paper)
-        Backward cycle loss: lambda_B * ||G_A(G_B(B)) - B|| (Eqn. (2) in the paper)
+        Forward cycle loss:  lambda_A * ||G_B(G_A(A)) - A|| 
+        Backward cycle loss: lambda_B * ||G_A(G_B(B)) - B|| 
         Identity loss (optional): lambda_identity * (||G_A(B) - B|| * lambda_B + ||G_B(A) - A|| * lambda_A) (Sec 5.2 "Photo generation from paintings" in the paper)
         Dropout is not used in the original CycleGAN paper.
         """
@@ -130,7 +135,7 @@ class CycleGANModel(BaseModel):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
 
         Parameters:
-            input (dict): include the data itself and its metadata information.
+            batch (dict): include the data itself and its metadata information.
 
         The option 'direction' can be used to swap domain A and domain B.
         """
@@ -227,23 +232,23 @@ class CycleGANModel(BaseModel):
         self.optimizer_D_B.step()  # update D_A and D_B's weights 
 
     def get_visuals(self, epoch, epoch_iter):
-        img_real_A = mod_to_pil(self.real_A)
-        img_fake_B = mod_to_pil(self.fake_B)
-        img_rec_A = mod_to_pil(self.rec_A)
-        img_real_B = mod_to_pil(self.real_B)
-        img_fake_A = mod_to_pil(self.fake_A)
-        img_rec_B = mod_to_pil(self.rec_B)
+        img_real_A = mod_to_pil(self.real_A) # conversion of tensor to an image for real image - Domain A
+        img_fake_B = mod_to_pil(self.fake_B) # conversion of tensor to an image for generator A2_B output - Domain B
+        img_rec_A = mod_to_pil(self.rec_A) # conversion of tensor to an image for fake B to A output - Domain A
+        img_real_B = mod_to_pil(self.real_B) # conversion of tensor to an image for real image - Domain B
+        img_fake_A = mod_to_pil(self.fake_A) # conversion of tensor to an image for generator B2_A output - Domain A
+        img_rec_B = mod_to_pil(self.rec_B) # conversion of tensor to an image for fake A to B output - Domain B
 
-        images = [img_real_A, img_fake_B, img_rec_A, img_real_B, img_fake_A, img_rec_B]
+        images = [img_real_A, img_fake_B, img_rec_A, img_real_B, img_fake_A, img_rec_B] #arranging images and creating boundaries
         num_rows = 2
         num_columns = 3
         image_width, image_height = images[0].size
         output_width = num_columns * image_width
         output_height = num_rows * image_height
 
-        output_image = Image.new('RGB', (output_width, output_height))
+        output_image = Image.new('RGB', (output_width, output_height)) #creating blank image with right dimensions
         # Paste the individual PIL images onto the output image
-        for i, image in enumerate(images):
+        for i, image in enumerate(images): 
             row = i // num_columns
             col = i % num_columns
             x_offset = col * image_width
