@@ -73,7 +73,7 @@ def mkdir(path):
 
 
 to_pil = transforms.ToPILImage()
-rgb_to_gray = transforms.Grayscale(num_output_channels=1)
+to_gray = transforms.Grayscale(num_output_channels=1)
 
 class QueueMask():
     def __init__(self, length):
@@ -94,17 +94,12 @@ class QueueMask():
         assert self.queue.__len__() > 0, 'Error! Empty queue!'
         return self.queue[self.queue.__len__()-1]
 
-
-
 def mask_generator(shadow, shadow_free, isHyper=False):
     
-    if isHyper:
-
-        im_f = hyper_to_gray(shadow_free)
-        im_s = hyper_to_gray(shadow)
-    else:
-        im_f = rgb_to_gray(mod_to_pil(shadow_free, isHyper))
-        im_s = rgb_to_gray(mod_to_pil(shadow, isHyper))
+    im_f = to_gray(mod_to_pil(shadow_free, isHyper))
+    im_s = to_gray(mod_to_pil(shadow, isHyper))
+	# im_f = to_gray(to_pil(((shadow_free.data.squeeze(0) + 1.0) * 0.5).cpu()))
+	# im_s = to_gray(to_pil(((shadow.data.squeeze(0) + 1.0) * 0.5).cpu()))
 
     diff = (np.asarray(im_f, dtype='float32')- np.asarray(im_s, dtype='float32')) # difference between shadow image and shadow_free image
     L = threshold_otsu(diff)
@@ -112,6 +107,24 @@ def mask_generator(shadow, shadow_free, isHyper=False):
     mask.requires_grad = False
 
     return mask
+
+
+# def mask_generator(shadow, shadow_free, isHyper=False):
+    
+#     if isHyper:
+
+#         im_f = hyper_to_gray(shadow_free)
+#         im_s = hyper_to_gray(shadow)
+#     else:
+#         im_f = rgb_to_gray(mod_to_pil(shadow_free, isHyper))
+#         im_s = rgb_to_gray(mod_to_pil(shadow, isHyper))
+
+#     diff = (np.asarray(im_f, dtype='float32')- np.asarray(im_s, dtype='float32')) # difference between shadow image and shadow_free image
+#     L = threshold_otsu(diff)
+#     mask = torch.tensor((np.float32(diff >= L)-0.5)/0.5).unsqueeze(0).unsqueeze(0).cuda() #-1.0:non-shadow, 1.0:shadow
+#     mask.requires_grad = False
+
+#     return mask
 
 def mod_to_pil(tensor, isHyper=False):
 
@@ -129,6 +142,18 @@ def mod_to_pil(tensor, isHyper=False):
         rgb_image = np.dstack((red, green, blue))
 
         return (to_pil(rgb_image))
+    
+def mod_to_spectral(tensor):
+    img = 0.5 * (tensor.detach().data + 1.0)
+    tensor_permuted = img.data.squeeze(0).cpu().permute(1,2,0)
+    arr = tensor_permuted.numpy()
+    arr_list = []
+
+    for i in range(arr.shape[2]):
+        twoD = normalize_band(arr[:, :, i])
+        arr_list.append(twoD)
+    
+    return np.dstack(arr_list)
 
 def tensor2spectral(tensor, x, y):
     
