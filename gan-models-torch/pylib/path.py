@@ -41,13 +41,13 @@ def ext(path):
 
 
 def name_ext(path):
-    return ''.join(split(path)[1:])
+    return "".join(split(path)[1:])
 
 
 def change_ext(path, ext):
-    if ext[0] == '.':
+    if ext[0] == ".":
         ext = ext[1:]
-    return os.path.splitext(path)[0] + '.' + ext
+    return os.path.splitext(path)[0] + "." + ext
 
 
 asbpath = os.path.abspath
@@ -56,23 +56,23 @@ asbpath = os.path.abspath
 join = os.path.join
 
 
-def prefix(path, prefixes, sep='-'):
+def prefix(path, prefixes, sep="-"):
     prefixes = prefixes if isinstance(prefixes, (list, tuple)) else [prefixes]
     dir, name, ext = split(path)
     return join(dir, sep.join(prefixes) + sep + name + ext)
 
 
-def suffix(path, suffixes, sep='-'):
+def suffix(path, suffixes, sep="-"):
     suffixes = suffixes if isinstance(suffixes, (list, tuple)) else [suffixes]
     dir, name, ext = split(path)
     return join(dir, name + sep + sep.join(suffixes) + ext)
 
 
-def prefix_now(path, fmt="%Y-%m-%d-%H:%M:%S", sep='-'):
+def prefix_now(path, fmt="%Y-%m-%d-%H:%M:%S", sep="-"):
     return prefix(path, prefixes=datetime.datetime.now().strftime(fmt), sep=sep)
 
 
-def suffix_now(path, fmt="%Y-%m-%d-%H:%M:%S", sep='-'):
+def suffix_now(path, fmt="%Y-%m-%d-%H:%M:%S", sep="-"):
     return suffix(path, suffixes=datetime.datetime.now().strftime(fmt), sep=sep)
 
 

@@ -79,6 +79,28 @@ if __name__ == "__main__":
     model.data_length = len(dataloader.dataset)
     model.setup(opt)
 
+    G_layers_to_unfreeze = []
+    D_layers_to_unfreeze = []
+
+    if opt.unfreeze_layers_iters > 0:
+        for i in range(1, opt.unfreeze_layers_iters + 1):
+            G_layer_count = input(
+                "For round {} of unfreezing during training, pick how many Generator layers you would like to unfreeze: ".format(
+                    i
+                )
+            )
+            D_layer_count = input(
+                "For round {} of unfreezing during training, pick how many Discriminator layers you would like to unfreeze: ".format(
+                    i
+                )
+            )
+            G_layers_to_unfreeze.append(int(G_layer_count))
+            D_layers_to_unfreeze.append(int(D_layer_count))
+
+        model.gradually_unfreeze_layers(
+            opt, G_layers_to_unfreeze[0], D_layers_to_unfreeze[0], 0
+        )
+
     G_losses, D_A_losses, D_B_losses = (
         model.G_losses,
         model.D_A_losses,
@@ -102,6 +124,14 @@ if __name__ == "__main__":
         G_loss_temp = 0
         D_A_loss_temp = 0
         D_B_loss_temp = 0
+
+        if opt.unfreeze_layers_iters > 1:
+
+            iter_num = (epoch - opt.epoch_count) // opt.unfreeze_interval
+            print("iter num", iter_num)
+            if (epoch - opt.epoch_count) % opt.unfreeze_interval == 0 and iter_num <= opt.unfreeze_layers_iters and iter_num > 0:
+                
+                model.gradually_unfreeze_layers(opt, sum(G_layers_to_unfreeze[:iter_num+1]), sum(D_layers_to_unfreeze[:iter_num+1]), iter_num)
 
         for i, batch in tqdm.tqdm(
             enumerate(dataloader),
