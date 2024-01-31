@@ -26,8 +26,12 @@ class Timer:  # deprecated, use tqdm instead
 
     """
 
-    def __init__(self, fmt='s', print_at_exit=True, timer=timeit.default_timer):
-        assert fmt in ['ms', 's', 'datetime'], "`fmt` should be 'ms', 's' or 'datetime'!"
+    def __init__(self, fmt="s", print_at_exit=True, timer=timeit.default_timer):
+        assert fmt in [
+            "ms",
+            "s",
+            "datetime",
+        ], "`fmt` should be 'ms', 's' or 'datetime'!"
         self._fmt = fmt
         self._print_at_exit = print_at_exit
         self._timer = timer
@@ -57,13 +61,13 @@ class Timer:  # deprecated, use tqdm instead
         return self._timer() - self.start_time
 
     def fmt(self, second):
-        if self._fmt == 'ms':
+        if self._fmt == "ms":
             time_fmt = second * 1000
-            time_str = '%s %s' % (time_fmt, self._fmt)
-        elif self._fmt == 's':
+            time_str = "%s %s" % (time_fmt, self._fmt)
+        elif self._fmt == "s":
             time_fmt = second
-            time_str = '%s %s' % (time_fmt, self._fmt)
-        elif self._fmt == 'datetime':
+            time_str = "%s %s" % (time_fmt, self._fmt)
+        elif self._fmt == "datetime":
             time_fmt = datetime.timedelta(seconds=second)
             time_str = str(time_fmt)
         return time_fmt, time_str
@@ -85,9 +89,15 @@ def timeit(run_times=1, **timer_kwargs):
                 for _ in range(run_times):
                     out = f(*args, **kwargs)
             fmt = '[*] Execution time of function "%(function_name)s" for %(run_times)d runs is %(execution_time)s = %(execution_time_each)s * %(run_times)d [*]'
-            context = {'function_name': f.__name__, 'run_times': run_times, 'execution_time': t, 'execution_time_each': t.fmt(t.elapsed / run_times)[1]}
+            context = {
+                "function_name": f.__name__,
+                "run_times": run_times,
+                "execution_time": t,
+                "execution_time_each": t.fmt(t.elapsed / run_times)[1],
+            }
             print(fmt % context)
             return out
+
         return wrapper
 
     return decorator
@@ -103,23 +113,23 @@ if __name__ == "__main__":
         print(t)
         time.sleep(1)
 
-    with Timer(fmt='datetime') as t:
+    with Timer(fmt="datetime") as t:
         time.sleep(1)
 
     # 2
     print(2)
-    t = Timer(fmt='ms')
+    t = Timer(fmt="ms")
     time.sleep(2)
     print(t)
 
-    t = Timer(fmt='datetime')
+    t = Timer(fmt="datetime")
     time.sleep(1)
     print(t)
 
     # 3
     print(3)
 
-    @timeit(run_times=5, fmt='s')
+    @timeit(run_times=5, fmt="s")
     def blah():
         time.sleep(2)
 

@@ -8,8 +8,16 @@ from dataset.maskshadow_dataset import MaskImageDataset
 import pylib as py
 import functools
 from PIL import Image
-from util.util import LambdaLR, weights_init_normal, ReplayBuffer, QueueMask, mask_generator, mod_to_pil
-from hyperspectral.util.eval_metrics import mean_squared_error 
+from util.util import (
+    LambdaLR,
+    weights_init_normal,
+    ReplayBuffer,
+    QueueMask,
+    mask_generator,
+    mod_to_pil,
+)
+from hyperspectral.util.eval_metrics import mean_squared_error
+
 
 class MaskShadowGANModel(BaseModel):
     """
@@ -22,84 +30,145 @@ class MaskShadowGANModel(BaseModel):
 
     CycleGAN paper: https://arxiv.org/pdf/1703.10593.pdf
     """
-    
+
     def __init__(self, opt):
-        BaseModel.__init__(self, opt) #calling constructor of super class
-        self.loss_names = ['D_A', 'G_A2B', 'cycle_ABA', 'idt_A', 'D_B', 'G_B2A', 'cycle_BAB', 'idt_B'] #setting up loss names
-        self.create_networks(opt) #creating networks upon startup
+        BaseModel.__init__(self, opt)  # calling constructor of super class
+        self.loss_names = [
+            "D_A",
+            "G_A2B",
+            "cycle_ABA",
+            "idt_A",
+            "D_B",
+            "G_B2A",
+            "cycle_BAB",
+            "idt_B",
+        ]  # setting up loss names
+        self.create_networks(opt)  # creating networks upon startup
 
     def setup(self, opt):
         super().setup(opt)
 
-        self.mask_queue =  QueueMask(self.data_length/4) #Queue for storing masks with finite storage to prioritize mask generation improvement 
-        print(self.data_length/4) #printing the length
+        self.mask_queue = QueueMask(
+            self.data_length / 4
+        )  # Queue for storing masks with finite storage to prioritize mask generation improvement
+        print(self.data_length / 4)  # printing the length
 
     def create_networks(self, opt):
-        
+
         if self.isTrain:
-            self.model_names = ['G_A2B', 'G_B2A', 'D_A', 'D_B'] #initializing generator and discriminator list for getattr()
-            self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc) #initializing subnets for image to image translation
+            self.model_names = [
+                "G_A2B",
+                "G_B2A",
+                "D_A",
+                "D_B",
+            ]  # initializing generator and discriminator list for getattr()
+            self.G_A2B = networks.Generator(
+                opt.input_nc, opt.output_nc
+            )  # initializing subnets for image to image translation
             self.G_B2A = networks.Generator_F2S(opt.output_nc, opt.input_nc)
             self.D_A = networks.Discriminator(opt.input_nc)
             self.D_B = networks.Discriminator(opt.output_nc)
 
-            if opt.cuda: #detecting GPU on runtime for models to be evaluated using GPU compute
+            if (
+                opt.cuda
+            ):  # detecting GPU on runtime for models to be evaluated using GPU compute
                 print("Using GPU")
                 self.G_A2B.cuda()
                 self.G_B2A.cuda()
                 self.D_A.cuda()
                 self.D_B.cuda()
-            
-            self.G_A2B.apply(weights_init_normal) #initializing baseline weights
+
+            self.G_A2B.apply(weights_init_normal)  # initializing baseline weights
             self.G_B2A.apply(weights_init_normal)
             self.D_A.apply(weights_init_normal)
             self.D_B.apply(weights_init_normal)
 
-            
             self.criterionGAN = torch.nn.MSELoss()  # define GAN loss.
-            self.criterionCycle = torch.nn.L1Loss() #cyclic loss after passing through both generators
-            self.criterionIdentity = torch.nn.L1Loss() #identity loss for using wrong generator on image from another domain
+            self.criterionCycle = (
+                torch.nn.L1Loss()
+            )  # cyclic loss after passing through both generators
+            self.criterionIdentity = (
+                torch.nn.L1Loss()
+            )  # identity loss for using wrong generator on image from another domain
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
-            self.optimizer_G = torch.optim.Adam(itertools.chain(self.G_A2B.parameters(), self.G_B2A.parameters()), lr=opt.lr, betas=(opt.beta_1, 0.999))
-            self.optimizer_D_A = torch.optim.Adam(self.D_A.parameters(), lr=opt.lr, betas=(0.5, 0.999))
-            self.optimizer_D_B = torch.optim.Adam(self.D_B.parameters(), lr=opt.lr, betas=(0.5, 0.999))
-            self.optimizers.append('optimizer_G')
-            self.optimizers.append('optimizer_D_A') #appending optimizers by name for saving and loading
-            self.optimizers.append('optimizer_D_B')  #getattr() will be called to reference the object
-            self.lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(self.optimizer_G,
-												   lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step)
-            self.lr_scheduler_D_A = torch.optim.lr_scheduler.LambdaLR(self.optimizer_D_A,
-													 lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step)
-            self.lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(self.optimizer_D_B,
-													 lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step)
-            self.lrs.append('lr_scheduler_G')  #appending learning rate schedulars by name for saving and loading
-            self.lrs.append('lr_scheduler_D_A')#getattr() will be called to reference the object
-            self.lrs.append('lr_scheduler_D_B')
-            
+            self.optimizer_G = torch.optim.Adam(
+                itertools.chain(self.G_A2B.parameters(), self.G_B2A.parameters()),
+                lr=opt.lr,
+                betas=(opt.beta_1, 0.999),
+            )
+            self.optimizer_D_A = torch.optim.Adam(
+                self.D_A.parameters(), lr=opt.lr, betas=(0.5, 0.999)
+            )
+            self.optimizer_D_B = torch.optim.Adam(
+                self.D_B.parameters(), lr=opt.lr, betas=(0.5, 0.999)
+            )
+            self.optimizers.append("optimizer_G")
+            self.optimizers.append(
+                "optimizer_D_A"
+            )  # appending optimizers by name for saving and loading
+            self.optimizers.append(
+                "optimizer_D_B"
+            )  # getattr() will be called to reference the object
+            self.lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(
+                self.optimizer_G,
+                lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step,
+            )
+            self.lr_scheduler_D_A = torch.optim.lr_scheduler.LambdaLR(
+                self.optimizer_D_A,
+                lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step,
+            )
+            self.lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(
+                self.optimizer_D_B,
+                lr_lambda=LambdaLR(opt.epochs, opt.epoch_count, opt.epoch_decay).step,
+            )
+            self.lrs.append(
+                "lr_scheduler_G"
+            )  # appending learning rate schedulars by name for saving and loading
+            self.lrs.append(
+                "lr_scheduler_D_A"
+            )  # getattr() will be called to reference the object
+            self.lrs.append("lr_scheduler_D_B")
+
         else:  # during test time, only load Gs
-            self.model_names = ['G_A2B', 'G_B2A'] #for testing, only generators are required
+            self.model_names = [
+                "G_A2B",
+                "G_B2A",
+            ]  # for testing, only generators are required
             self.G_A2B = networks.Generator(opt.input_nc, opt.output_nc)
             self.G_B2A = networks.Generator_F2S(opt.output_nc, opt.input_nc)
 
             if opt.cuda:
                 print("Using GPU")
                 self.G_A2B.cuda()
-                self.G_B2A.cuda() #transferring computation to GPU
- 
-            self.G_A2B.apply(weights_init_normal) #initializing normal weights
+                self.G_B2A.cuda()  # transferring computation to GPU
+
+            self.G_A2B.apply(weights_init_normal)  # initializing normal weights
             self.G_B2A.apply(weights_init_normal)
-        
-        Tensor = torch.cuda.FloatTensor if opt.cuda else torch.Tensor  #Using float tensor given GPU resource
-        self.input_A = Tensor(opt.batch_size, opt.input_nc, opt.crop_size, opt.crop_size) #input tensor for data unpacking - Domain A
-        self.input_B = Tensor(opt.batch_size, opt.output_nc, opt.crop_size, opt.crop_size) #input tensor for data unpacking - Domain B
-        self.target_real = torch.autograd.Variable(Tensor(opt.batch_size).fill_(1.0), requires_grad=False) # tensor for a real decision - all 1s 
-        self.target_fake = torch.autograd.Variable(Tensor(opt.batch_size).fill_(0.0), requires_grad=False) # tensor for a fake decision - all 0s
-        self.mask_non_shadow = torch.autograd.Variable(Tensor(opt.batch_size, 1, opt.crop_size, opt.crop_size).fill_(-1.0), requires_grad=False) #-1.0 non-shadow
+
+        Tensor = (
+            torch.cuda.FloatTensor if opt.cuda else torch.Tensor
+        )  # Using float tensor given GPU resource
+        self.input_A = Tensor(
+            opt.batch_size, opt.input_nc, opt.crop_size, opt.crop_size
+        )  # input tensor for data unpacking - Domain A
+        self.input_B = Tensor(
+            opt.batch_size, opt.output_nc, opt.crop_size, opt.crop_size
+        )  # input tensor for data unpacking - Domain B
+        self.target_real = torch.autograd.Variable(
+            Tensor(opt.batch_size).fill_(1.0), requires_grad=False
+        )  # tensor for a real decision - all 1s
+        self.target_fake = torch.autograd.Variable(
+            Tensor(opt.batch_size).fill_(0.0), requires_grad=False
+        )  # tensor for a fake decision - all 0s
+        self.mask_non_shadow = torch.autograd.Variable(
+            Tensor(opt.batch_size, 1, opt.crop_size, opt.crop_size).fill_(-1.0),
+            requires_grad=False,
+        )  # -1.0 non-shadow
 
         self.fake_A_buffer = ReplayBuffer()
         self.fake_B_buffer = ReplayBuffer()
 
-        print('networks created: ', self.model_names)
+        print("networks created: ", self.model_names)
 
     @staticmethod
     def modify_commandline_options(parser, is_train=True):
@@ -123,19 +192,33 @@ class MaskShadowGANModel(BaseModel):
         """
         parser.set_defaults(no_dropout=True)  # default CycleGAN did not use dropout
         if is_train:
-            parser.add_argument('--lambda_A', type=float, default=10.0, help='weight for cycle loss (A -> B -> A)')
-            parser.add_argument('--lambda_B', type=float, default=10.0, help='weight for cycle loss (B -> A -> B)')
-            parser.add_argument('--lambda_identity', type=float, default=0.5, help='use identity mapping. Setting lambda_identity other than 0 has an effect of scaling the weight of the identity mapping loss. For example, if the weight of the identity loss should be 10 times smaller than the weight of the reconstruction loss, please set lambda_identity = 0.1')
+            parser.add_argument(
+                "--lambda_A",
+                type=float,
+                default=10.0,
+                help="weight for cycle loss (A -> B -> A)",
+            )
+            parser.add_argument(
+                "--lambda_B",
+                type=float,
+                default=10.0,
+                help="weight for cycle loss (B -> A -> B)",
+            )
+            parser.add_argument(
+                "--lambda_identity",
+                type=float,
+                default=0.5,
+                help="use identity mapping. Setting lambda_identity other than 0 has an effect of scaling the weight of the identity mapping loss. For example, if the weight of the identity loss should be 10 times smaller than the weight of the reconstruction loss, please set lambda_identity = 0.1",
+            )
 
         return parser
-    
+
     def update_learning_rate(self):
         for lr in self.lrs:
             getattr(self, lr).step()
-    
 
     def mask_init(self, length):
-        self.mask_queue =  QueueMask(length/4)
+        self.mask_queue = QueueMask(length / 4)
 
     def set_input(self, batch):
         """Unpack input data from the dataloader and perform necessary pre-processing steps.
@@ -145,25 +228,29 @@ class MaskShadowGANModel(BaseModel):
 
         The option 'direction' can be used to swap domain A and domain B.
         """
-        self.real_A = torch.autograd.Variable(self.input_A.copy_(batch['A']))
-        self.real_B = torch.autograd.Variable(self.input_B.copy_(batch['B']))
+        self.real_A = torch.autograd.Variable(self.input_A.copy_(batch["A"]))
+        self.real_B = torch.autograd.Variable(self.input_B.copy_(batch["B"]))
         return None
 
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         self.fake_B = self.G_A2B(self.real_A)  # G_A(A)
 
-        self.computed_mask = mask_generator(self.real_A, self.fake_B) #processing tensors for mask generation via thresholding
-        self.mask_queue.insert(self.computed_mask) #inserting generated mask into queue
+        self.computed_mask = mask_generator(
+            self.real_A, self.fake_B
+        )  # processing tensors for mask generation via thresholding
+        self.mask_queue.insert(
+            self.computed_mask
+        )  # inserting generated mask into queue
 
-        
-        self.rec_A = self.G_B2A(self.fake_B, self.mask_queue.last_item())   # G_B(G_A(A))
-        
+        self.rec_A = self.G_B2A(self.fake_B, self.mask_queue.last_item())  # G_B(G_A(A))
 
-        self.rand_guide_mask = self.mask_queue.rand_item() #using random mask from queue for guidance
+        self.rand_guide_mask = (
+            self.mask_queue.rand_item()
+        )  # using random mask from queue for guidance
         self.fake_A = self.G_B2A(self.real_B, self.rand_guide_mask)  # G_B(B)
-        
-        self.rec_B = self.G_A2B(self.fake_A)   # G_A(G_B(B))
+
+        self.rec_B = self.G_A2B(self.fake_A)  # G_A(G_B(B))
 
     def backward_D_basic(self, netD, real, fake):
         """Calculate GAN loss for the discriminator
@@ -181,12 +268,11 @@ class MaskShadowGANModel(BaseModel):
         loss_D_real = self.criterionGAN(pred_real, self.target_real)
         # Fake
         pred_fake = netD(fake.detach())
-        loss_D_fake = self.criterionGAN(pred_fake,  self.target_fake)
+        loss_D_fake = self.criterionGAN(pred_fake, self.target_fake)
         # Combined loss and calculate gradients
         loss_D = (loss_D_real + loss_D_fake) * 0.5
         loss_D.backward()
         return loss_D
-
 
     def backward_D_A(self):
         """Calculate GAN loss for discriminator D_A"""
@@ -207,18 +293,20 @@ class MaskShadowGANModel(BaseModel):
         if lambda_idt > 0:
             # G_A should be identity if real_B is fed: ||G_A(B) - B||
             self.idt_A = self.G_A2B(self.real_B)
-            self.loss_idt_A = self.criterionIdentity(self.idt_A, self.real_B) * lambda_B * lambda_idt
+            self.loss_idt_A = (
+                self.criterionIdentity(self.idt_A, self.real_B) * lambda_B * lambda_idt
+            )
             # G_B should be identity if real_A is fed: ||G_B(A) - A||
             self.idt_B = self.G_B2A(self.real_A, self.mask_non_shadow)
-            self.loss_idt_B = self.criterionIdentity(self.idt_B, self.real_A) * lambda_A * lambda_idt
+            self.loss_idt_B = (
+                self.criterionIdentity(self.idt_B, self.real_A) * lambda_A * lambda_idt
+            )
         else:
             self.loss_idt_A = 0
             self.loss_idt_B = 0
 
         # GAN loss D_A(G_A(A))
         self.loss_G_A2B = self.criterionGAN(self.D_B(self.fake_B), self.target_real)
-
-        
 
         # GAN loss D_B(G_B(B))
         self.loss_G_B2A = self.criterionGAN(self.D_A(self.fake_A), self.target_real)
@@ -227,27 +315,34 @@ class MaskShadowGANModel(BaseModel):
         # Backward cycle loss || G_A(G_B(B)) - B||
         self.loss_cycle_BAB = self.criterionCycle(self.rec_B, self.real_B) * lambda_B
         # combined loss and calculate gradients
-        self.loss_G = self.loss_G_A2B + self.loss_G_B2A + self.loss_cycle_ABA + self.loss_cycle_BAB + self.loss_idt_A + self.loss_idt_B
-        
+        self.loss_G = (
+            self.loss_G_A2B
+            + self.loss_G_B2A
+            + self.loss_cycle_ABA
+            + self.loss_cycle_BAB
+            + self.loss_idt_A
+            + self.loss_idt_B
+        )
+
         self.loss_G.backward()
 
     def optimize_parameters(self):
         """Calculate losses, gradients, and update network weights; called in every training iteration"""
         # forward
-        self.forward()      # compute fake images and reconstruction images.
+        self.forward()  # compute fake images and reconstruction images.
         # G_A and G_B
         # self.set_requires_grad([self.netD_A, self.netD_B], False)  # Ds require no gradients when optimizing Gs
         self.optimizer_G.zero_grad()  # set G_A and G_B's gradients to zero
-        self.backward_G()             # calculate gradients for G_A and G_B
-        self.optimizer_G.step()       # update G_A and G_B's weights
+        self.backward_G()  # calculate gradients for G_A and G_B
+        self.optimizer_G.step()  # update G_A and G_B's weights
         # D_A and D_B
         # self.set_requires_grad([self.netD_A, self.netD_B], True)
-        self.optimizer_D_A.zero_grad()   # set D_A and D_B's gradients to zero
-        self.optimizer_D_B.zero_grad()   # set D_A and D_B's gradients to zero
-        self.backward_D_A()      # calculate gradients for D_A
-        self.backward_D_B()      # calculate graidents for D_B
+        self.optimizer_D_A.zero_grad()  # set D_A and D_B's gradients to zero
+        self.optimizer_D_B.zero_grad()  # set D_A and D_B's gradients to zero
+        self.backward_D_A()  # calculate gradients for D_A
+        self.backward_D_B()  # calculate graidents for D_B
         self.optimizer_D_A.step()  # update D_A and D_B's weights
-        self.optimizer_D_B.step()  # update D_A and D_B's weights 
+        self.optimizer_D_B.step()  # update D_A and D_B's weights
 
     def get_visuals(self, epoch_iter, epoch=0):
 
@@ -256,28 +351,44 @@ class MaskShadowGANModel(BaseModel):
         num_columns = 0
 
         if self.isTrain:
-            images.append(mod_to_pil(self.real_A)) # conversion of tensor to an image for real image - Domain A
-            images.append(mod_to_pil(self.fake_B)) # conversion of tensor to an image for generator A2_B output - Domain B
-            images.append(mod_to_pil(self.rec_A)) # conversion of tensor to an image for fake B to A output - Domain A
-            images.append(mod_to_pil(self.computed_mask)) #thresholded mask
-            images.append(mod_to_pil(self.real_B)) # conversion of tensor to an image for real image - Domain B
-            images.append(mod_to_pil(self.fake_A)) # conversion of tensor to an image for generator B2_A output - Domain A
-            images.append(mod_to_pil(self.rec_B)) # conversion of tensor to an image for fake A to B output - Domain B
-            images.append(mod_to_pil(self.rand_guide_mask)) #random mask used for shadowing
+            images.append(
+                mod_to_pil(self.real_A)
+            )  # conversion of tensor to an image for real image - Domain A
+            images.append(
+                mod_to_pil(self.fake_B)
+            )  # conversion of tensor to an image for generator A2_B output - Domain B
+            images.append(
+                mod_to_pil(self.rec_A)
+            )  # conversion of tensor to an image for fake B to A output - Domain A
+            images.append(mod_to_pil(self.computed_mask))  # thresholded mask
+            images.append(
+                mod_to_pil(self.real_B)
+            )  # conversion of tensor to an image for real image - Domain B
+            images.append(
+                mod_to_pil(self.fake_A)
+            )  # conversion of tensor to an image for generator B2_A output - Domain A
+            images.append(
+                mod_to_pil(self.rec_B)
+            )  # conversion of tensor to an image for fake A to B output - Domain B
+            images.append(
+                mod_to_pil(self.rand_guide_mask)
+            )  # random mask used for shadowing
             num_rows = 2
             num_columns = 4
         else:
-            images.append(mod_to_pil(self.real_A)) #append only A -> B transformation if not training
+            images.append(
+                mod_to_pil(self.real_A)
+            )  # append only A -> B transformation if not training
             images.append(mod_to_pil(self.fake_B))
             images.append(mod_to_pil(self.computed_mask))
             num_rows = 1
             num_columns = 3
-        #arranging images and creating boundaries
+        # arranging images and creating boundaries
         image_width, image_height = images[0].size
         output_width = num_columns * image_width
         output_height = num_rows * image_height
 
-        self.output_image = Image.new('RGB', (output_width, output_height))
+        self.output_image = Image.new("RGB", (output_width, output_height))
         # Paste the individual PIL images onto the output image
         for i, image in enumerate(images):
             row = i // num_columns
@@ -288,35 +399,40 @@ class MaskShadowGANModel(BaseModel):
 
         # Save the combined image as a PNG file
         if self.isTrain:
-            self.output_image.save(py.join(self.sample_dir, 'epoch-{}-iter-{}.jpg'.format(epoch, epoch_iter)))
+            self.output_image.save(
+                py.join(
+                    self.sample_dir, "epoch-{}-iter-{}.jpg".format(epoch, epoch_iter)
+                )
+            )
         else:
-            sample_save = py.join(self.sample_dir, 'img-{}.jpg'.format(epoch_iter))
+            sample_save = py.join(self.sample_dir, "img-{}.jpg".format(epoch_iter))
             self.output_image.save(sample_save)
-            
-            return mod_to_pil(self.real_A), mod_to_pil(self.fake_B)
 
+            return mod_to_pil(self.real_A), mod_to_pil(self.fake_B)
 
     def expand_dataset(self):
 
         hyper_shadowed = []
 
-        for i in range(int(self.data_length/4)): #iterating through queue
-            self.rand_guide_mask = self.mask_queue.rand_item() #selecting random mask
-            self.fake_A = self.G_B2A(self.real_B, self.rand_guide_mask)  # G_B(B) using sampled mask
+        for i in range(int(self.data_length / 4)):  # iterating through queue
+            self.rand_guide_mask = self.mask_queue.rand_item()  # selecting random mask
+            self.fake_A = self.G_B2A(
+                self.real_B, self.rand_guide_mask
+            )  # G_B(B) using sampled mask
             print(i)
-            images = [] #apending results
+            images = []  # apending results
             images.append(mod_to_pil(self.real_B))
             images.append(mod_to_pil(self.fake_A))
             images.append(mod_to_pil(self.rand_guide_mask))
             num_rows = 1
-            num_columns = 3 #arranging GT, fake shadowed A, and guidance mask
+            num_columns = 3  # arranging GT, fake shadowed A, and guidance mask
 
-            image_width, image_height = images[0].size 
+            image_width, image_height = images[0].size
             output_width = num_columns * image_width
             output_height = num_rows * image_height
 
-            output_image = Image.new('RGB', (output_width, output_height))
-            
+            output_image = Image.new("RGB", (output_width, output_height))
+
             # Paste the individual PIL images onto the output image
             for i, image in enumerate(images):
                 row = i // num_columns
@@ -327,6 +443,6 @@ class MaskShadowGANModel(BaseModel):
             hyper_shadowed.append(output_image)
 
         iter = 0
-        for hs in hyper_shadowed: #iterating through all sampled artificial images
+        for hs in hyper_shadowed:  # iterating through all sampled artificial images
             iter += 1
-            hs.save(py.join(self.sample_dir, 'img-{}.jpg'.format(iter)))
+            hs.save(py.join(self.sample_dir, "img-{}.jpg".format(iter)))

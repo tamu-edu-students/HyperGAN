@@ -14,7 +14,7 @@
 	// "image": "hypertools_cubert:latest" ,
 	// "image": "hypertools_4_2_cuda:latest" ,
 	// "image": "hypertools_current_opencv:latest" ,
-	"image": "hypergan_cuda:latest" ,
+	"image": "hypergan_vamin20:latest" ,
 	
 	"mounts": [
 		// below two mounts are for visualization on windows machine if there are issues with wsl
