@@ -1,6 +1,5 @@
 FROM nvidia/cuda:12.2.0-devel-ubuntu20.04
 
-
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update
@@ -160,8 +159,9 @@ RUN echo 'alias python3="/usr/bin/python3.9"' >> ~/.bashrc
 RUN echo 'export CUVIS="/lib/cuvis"' >> ~/.bashrc 
 RUN echo 'export CUVIS_DATA="/opt/cuvis"' >> ~/.bashrc 
 
+RUN useradd -m -u 1000 appuser
 
-WORKDIR /home
-
-RUN cd /home &&\
-    bash
+WORKDIR /app
+RUN chown -R appuser /app
+# Switch to the 'appuser' context
+USER appuser

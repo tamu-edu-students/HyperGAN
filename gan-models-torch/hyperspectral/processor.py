@@ -2,6 +2,7 @@ import numpy as np
 import spectral as spy
 import spectral.io.envi as envi
 import scipy.io as sio
+from scipy.interpolate import CubicHermiteSpline
 import io
 from scipy.ndimage import zoom
 import rasterio as rio
@@ -9,7 +10,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import cv2
 import cuvis
-
+import time
 
 class Processor:
     """
@@ -42,6 +43,7 @@ class Processor:
                 self.hsi_data = src.read()
 
             self.hsi_data = self.genArray()
+            print(self.hsi_data.shape)
             self.hsi_data = self.hyperCrop(self.hsi_data, 256)
             self.bands, self.rows, self.cols = self.hsi_data.shape
 
@@ -71,7 +73,7 @@ class Processor:
         if img_path.find("png") != -1:
 
             image = Image.open(img_path)
-            self.hsi_data = self.rgb_to_hyper(17, image)
+            #self.hsi_data = self.rgb_to_hyper(17, image, 'cubic')
             self.hsi_data = self.genArray()
             self.hsi_data = self.hyperCrop(self.hsi_data, 256)
             self.bands, self.rows, self.cols = self.hsi_data.shape
@@ -171,28 +173,88 @@ class Processor:
             np.uint8
         )  # normalizing data from band to uint8 format
 
-    def rgb_to_hyper(self, cube_rep, image):
+#     def rgb_to_hyper(self, cube_rep, image, fit):
+#         """
+#         fit : (str) Can be repeat, linear, or cubic. Determines the interpolation when inflating image.
+#         """
 
-        r, g, b = image.split()
-        colors = [np.array(r), np.array(g), np.array(b)]
-        arr_list = []
+#         r, g, b = image.split()
+        
+#         colors = [np.array(r), np.array(g), np.array(b)]
+       
+#         arr_list = []
 
-        for dim in colors:
-            for j in range(cube_rep):
-                arr_list.append(dim)
+#         if fit == 'repeat':
 
-        return np.stack(arr_list)
+#             for dim in colors:
+#                 for j in range(cube_rep):
+#                     arr_list.append(dim)
+#             arr_list = np.stack(arr_list)
+        
+#         if fit == 'cubic':
+#             arr_list = np.zeros((275, 290, 51))
+#             dy_dx = np.array([0, 0])
+#             start_time = time.time()
+#             for i in range(colors[0].shape[0]):
+#                 for j in range(colors[0].shape[1]):
+#                     r_val = colors[0][i][j]
+#                     g_val = colors[1][i][j]
+#                     b_val = colors[2][i][j]
+
+#                     x = np.array([1, 26, 51])
+#                     y = np.array([b_val, g_val, r_val])
+
+#                     cubic_spline_bg = CubicHermiteSpline(x[:2], y[:2], dy_dx)
+#                     b_g_x = np.arange(x[0], x[1])
+#                     b_g_y = cubic_spline_bg(b_g_x)
+
+#                     cubic_spline_gr = CubicHermiteSpline(x[1:], y[1:], dy_dx)
+#                     g_r_x = np.arange(x[1], x[2]+1)
+#                     g_r_y = cubic_spline_gr(g_r_x)
+                    
+
+#                     arr_list[i][j] = np.append(b_g_y, g_r_y)
+
+#                     # if i == 200 and j == 146:
+#                     #     print("red value", r_val)
+#                     #     print("green value", g_val)
+#                     #     print("blue value", b_val)
+
+#                     #     plt.plot(arr_list[i][j], marker='o', linestyle='-')
+#                     #     plt.title('Plot of Values')
+#                     #     plt.xlabel('Index')
+#                     #     plt.ylabel('Random Values')
+#                     #     plt.grid(True)
+#                     #     plt.show()                        
+
+#             end_time = time.time()
+
+# # Calculate the elapsed time
+#             elapsed_time = end_time - start_time
+
+#             # Print the result
+#             print(f"Time spent in the loop: {elapsed_time} seconds")
 
 
-# p = Processor()
-# p.prepare_data(r'/workspaces/HyperGAN/datasets/export/trainB/session_000_058_snapshot_ref.tiff')
-# # # p.genFalseRGB(25,12,3,visualize=True)
-# # # # #plt.imshow(p.hsi_data[12, :, :], cmap='gray')
-# # # plt.show()
 
-# # # p.prepare_data(r'/workspaces/HyperGAN/datasets/hsi/trainA/session_000_023_snapshot.cu3')
-# # # plt.imshow(p.hsi_data[:, :, 12], cmap='gray')
-# # # plt.show()
+#         return arr_list
 
-# print(p.hsi_data.shape)
-# # # rgb = p.genFalseRGB(27, 14, 8, visualize=True)
+
+p = Processor()
+p.prepare_data(r'datasets/transfer_experiment/trainA/3_inflated.tiff')
+print("shape is", p.hsi_data.shape)
+cropped_region = p.hsi_data[10:75, 12:24, :]
+print(cropped_region.shape)
+average_hyper = np.mean(cropped_region, axis=(0, 1))
+print(average_hyper.shape)
+print("Average hyper Values:", average_hyper)
+# # # # p.genFalseRGB(25,12,3,visualize=True)
+# # # # # #plt.imshow(p.hsi_data[12, :, :], cmap='gray')
+# # # # plt.show()
+# print(p.genFalseRGB().shape)
+# # # # p.prepare_data(r'/workspaces/HyperGAN/datasets/hsi/trainA/session_000_023_snapshot.cu3')
+# # # # plt.imshow(p.hsi_data[:, :, 12], cmap='gray')
+# # # # plt.show()
+
+# # print(p.hsi_data.shape)
+# # # # rgb = p.genFalseRGB(27, 14, 8, visualize=True)

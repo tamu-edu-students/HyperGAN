@@ -31,7 +31,8 @@
 	"runArgs": [
 		"--gpus",
 		"all", 
-		"--ipc=host"
+		"--ipc=host",
+		"--user 1000"
 
 	]
 
