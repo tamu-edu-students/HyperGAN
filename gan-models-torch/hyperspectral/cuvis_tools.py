@@ -11,7 +11,8 @@ import json
 from multiprocessing import cpu_count, Process, Value, Array, Pool, TimeoutError
 from processor import Processor
 from PIL import Image
-import tifffile as tiff
+import tifffile
+from scipy.interpolate import CubicHermiteSpline
 
 # from cuvis.Export import EnviExporter
 
@@ -163,7 +164,7 @@ def loadMeasurement(userSettingsDir, measurementLoc, visualize=False):
             im.set_array(x_norm * 50)
 
             plt.title(
-                "Hyperspectral Image Layer {} of {} with wavelentgth {}".format(
+                "Hyperspectral Image Layer {} of {} with wavelength {}".format(
                     i, mesu.Name, cube.wavelength[i]
                 )
             )
@@ -256,8 +257,74 @@ def exporter(file_type, domain):
             image = extract_rgb(hsi_data)
             image.save(os.path.join(outDir, "{}_rgb.png".format(iter)))
 
+def rgb_to_hyper(domain, fit=None, cube_rep=17):
+    """
+    fit : (str) Can be repeat, linear, or cubic. Determines the interpolation when inflating image.
+    """
+    measurementLoc = "./datasets/shadow_USR/train{}/".format(domain)
+    outDir = "./datasets/transfer_experiment/train{}/".format(domain)
+
+    png_files = glob.glob(os.path.join(measurementLoc, "*.jpg"))
+    iter = 80
+
+    for png_file in png_files:
+        image = Image.open(png_file)
+        image = image.resize((290,275))
+
+        r, g, b = image.split()
+        
+        colors = [np.array(r), np.array(g), np.array(b)]
+        print(colors[0].shape)
+        arr_list = []
+
+        if fit == 'repeat':
+
+            for dim in colors:
+                for j in range(cube_rep):
+                    arr_list.append(dim)
+            arr_list = np.stack(arr_list)
+        
+        if fit == 'cubic':
+            
+            arr_list = np.zeros((275, 290, 51))
+            dy_dx = np.array([0, 0])
+            start_time = time.time()
+            for i in range(colors[0].shape[0]):
+                for j in range(colors[0].shape[1]):
+                    r_val = colors[0][i][j]
+                    g_val = colors[1][i][j]
+                    b_val = colors[2][i][j]
+
+                    x = np.array([1, 26, 51])
+                    y = np.array([b_val, g_val, r_val])
+
+                    cubic_spline_bg = CubicHermiteSpline(x[:2], y[:2], dy_dx)
+                    b_g_x = np.arange(x[0], x[1])
+                    b_g_y = cubic_spline_bg(b_g_x)
+
+                    cubic_spline_gr = CubicHermiteSpline(x[1:], y[1:], dy_dx)
+                    g_r_x = np.arange(x[1], x[2]+1)
+                    g_r_y = cubic_spline_gr(g_r_x)
+                    arr_list[i][j] = np.append(b_g_y, g_r_y)
+
+
+            end_time = time.time()
+
+# Calculate the elapsed time
+            elapsed_time = end_time - start_time
+            print("final shape" , arr_list.shape)
+            tifffile.imwrite(os.path.join(outDir, "{}_inflated.tiff".format(iter)), arr_list)
+            # Print the result
+            print(f"Time spent in the loop: {elapsed_time} seconds")
+            print("iter ", iter, "path ", png_file)
+            iter += 1
+            print()
+
+
+
+
 
 if __name__ == "__main__":
 
     # exporter("png", "A")
-    rgb_to_hyper("A", 17)
+    rgb_to_hyper("B", 'cubic')
