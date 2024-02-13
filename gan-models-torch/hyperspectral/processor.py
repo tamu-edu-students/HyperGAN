@@ -241,13 +241,13 @@ class Processor:
 
 
 p = Processor()
-p.prepare_data(r'datasets/transfer_experiment/trainA/3_inflated.tiff')
-print("shape is", p.hsi_data.shape)
-cropped_region = p.hsi_data[10:75, 12:24, :]
-print(cropped_region.shape)
-average_hyper = np.mean(cropped_region, axis=(0, 1))
-print(average_hyper.shape)
-print("Average hyper Values:", average_hyper)
+p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
+p.genFalseRGB(visualize=True)
+# cropped_region = p.hsi_data[10:75, 12:24, :]
+# print(cropped_region.shape)
+# average_hyper = np.mean(cropped_region, axis=(0, 1))
+# print(average_hyper.shape)
+# print("Average hyper Values:", average_hyper)
 # # # # p.genFalseRGB(25,12,3,visualize=True)
 # # # # # #plt.imshow(p.hsi_data[12, :, :], cmap='gray')
 # # # # plt.show()

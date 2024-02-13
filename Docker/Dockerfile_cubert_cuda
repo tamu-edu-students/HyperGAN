@@ -159,9 +159,7 @@ RUN echo 'alias python3="/usr/bin/python3.9"' >> ~/.bashrc
 RUN echo 'export CUVIS="/lib/cuvis"' >> ~/.bashrc 
 RUN echo 'export CUVIS_DATA="/opt/cuvis"' >> ~/.bashrc 
 
-RUN useradd -m -u 1000 appuser
+WORKDIR /home
 
-WORKDIR /app
-RUN chown -R appuser /app
-# Switch to the 'appuser' context
-USER appuser
+RUN cd /home &&\
+    bash

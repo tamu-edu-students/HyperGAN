@@ -222,6 +222,7 @@ class MaskShadowHsiGANModel(BaseModel):
         """
         self.real_A = torch.autograd.Variable(self.input_A.copy_(batch["A"]))
         self.real_B = torch.autograd.Variable(self.input_B.copy_(batch["B"]))
+        print(self.real_A.shape)
         return None
 
     def forward(self):
