@@ -201,11 +201,17 @@ class EndmemberAnalyzer:
 
                 for row in reader:
                     for col in reader.fieldnames:
-                        self.existing_data[col].append(row[col])
+                        try:
+                            value = int(row[col])
+                        except ValueError:
+                            # Handle the case where the value cannot be converted to an integer
+                            # You might want to handle this differently based on your requirements
+                            value = 0  # Default value if conversion fails
+
+                        self.existing_data[col].append(value)
         
         return endmembers_csv_path
-    def do_nothing(self):
-        None
+
 
     def write_dict_to_csv(self, data, csv_file_name):
         with open(csv_file_name, 'w', newline='') as csv_file:

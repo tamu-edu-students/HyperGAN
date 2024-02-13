@@ -109,6 +109,7 @@ if __name__ == "__main__":
             total=len(dataloader.dataset),
         ):
 
+        
             model.set_input(batch)
             iter_start_time = time.time()
             if total_iters % opt.print_freq == 0:

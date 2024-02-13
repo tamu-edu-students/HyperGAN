@@ -7,9 +7,9 @@
                 crop_size: 256                           
                      cuda: False                         
         cycle_loss_weight: 10.0                          
-                 dataroot: transfer_experiment           	[default: None]
+                 dataroot: export_2                      	[default: None]
              datasets_dir: datasets                      
-              epoch_count: 205                           	[default: 1]
+              epoch_count: 1                             
               epoch_decay: 300                           
                    epochs: 500                           
                   gpu_ids: 0                             
@@ -32,13 +32,13 @@
                     phase: train                         
                 pool_size: 50                            
                print_freq: 100                           
-                  restore: True                          	[default: False]
+                  restore: False                         
               results_dir: samples_training              
              save_by_iter: False                         
           save_epoch_freq: 1                             
          save_latest_freq: 5000                          
                    suffix:                               
                  transfer: False                         
-        unfreeze_interval: 100                           	[default: 0]
-    unfreeze_layers_iters: 3                             	[default: 0]
+        unfreeze_interval: 0                             
+    unfreeze_layers_iters: 0                             
 ----------------- End -------------------
