@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
+
 class ResidualBlock(nn.Module):
     # Constructor method with in_features as a parameter
     def __init__(self, in_features):
@@ -23,7 +24,7 @@ class ResidualBlock(nn.Module):
             # 3x3 convolution with in_features input channels and in_features output channels
             nn.Conv2d(in_features, in_features, 3),
             # Instance normalization on the convolutional output
-            nn.InstanceNorm2d(in_features)
+            nn.InstanceNorm2d(in_features),
         ]
 
         # Create a sequential block using the convolutional block list
@@ -33,6 +34,7 @@ class ResidualBlock(nn.Module):
     def forward(self, x):
         # Return the sum of the input tensor and the output of the convolutional block
         return x + self.conv_block(x)
+
 
 class Generator(nn.Module):
     # Constructor method with input_nc, output_nc, and n_residual_blocks as parameters
@@ -49,7 +51,7 @@ class Generator(nn.Module):
             # Instance normalization on the convolutional output
             nn.InstanceNorm2d(64),
             # Apply the ReLU activation function in place
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
         ]
 
         # Downsampling
@@ -62,7 +64,7 @@ class Generator(nn.Module):
                 # Instance normalization on the convolutional output
                 nn.InstanceNorm2d(out_features),
                 # Apply the ReLU activation function in place
-                nn.ReLU(inplace=True)
+                nn.ReLU(inplace=True),
             ]
             in_features = out_features
             out_features = in_features * 2
@@ -77,11 +79,13 @@ class Generator(nn.Module):
         for _ in range(2):
             # 3x3 transpose convolution with in_features input channels and out_features output channels, stride=2
             model += [
-                nn.ConvTranspose2d(in_features, out_features, 3, stride=2, padding=1, output_padding=1),
+                nn.ConvTranspose2d(
+                    in_features, out_features, 3, stride=2, padding=1, output_padding=1
+                ),
                 # Instance normalization on the convolutional output
                 nn.InstanceNorm2d(out_features),
                 # Apply the ReLU activation function in place
-                nn.ReLU(inplace=True)
+                nn.ReLU(inplace=True),
             ]
             in_features = out_features
             out_features = in_features // 2
@@ -91,7 +95,7 @@ class Generator(nn.Module):
             # Pad the input tensor with reflection padding of size 3
             nn.ReflectionPad2d(3),
             # 7x7 convolution with 64 input channels and output_nc output channels
-            nn.Conv2d(64, output_nc, 7)
+            nn.Conv2d(64, output_nc, 7),
             # Tanh activation function is typically used to scale outputs between -1 and 1
             # nn.Tanh()
         ]
@@ -104,6 +108,7 @@ class Generator(nn.Module):
         # Return the sum of the generator model output and the input tensor, scaled by Tanh activation
         return (self.model(x) + x).tanh()
 
+
 class Generator_F2S(nn.Module):
     # Constructor method with input_nc, output_nc, and n_residual_blocks as parameters
     def __init__(self, input_nc, output_nc, n_residual_blocks=9):
@@ -115,11 +120,11 @@ class Generator_F2S(nn.Module):
             # Pad the input tensor with reflection padding of size 3
             nn.ReflectionPad2d(3),
             # 7x7 convolution with input_nc+1 input channels and 64 output channels
-            nn.Conv2d(input_nc+1, 64, 7),
+            nn.Conv2d(input_nc + 1, 64, 7),
             # Instance normalization on the convolutional output
             nn.InstanceNorm2d(64),
             # Apply the ReLU activation function in place
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
         ]
 
         # Downsampling
@@ -132,7 +137,7 @@ class Generator_F2S(nn.Module):
                 # Instance normalization on the convolutional output
                 nn.InstanceNorm2d(out_features),
                 # Apply the ReLU activation function in place
-                nn.ReLU(inplace=True)
+                nn.ReLU(inplace=True),
             ]
             in_features = out_features
             out_features = in_features * 2
@@ -147,11 +152,13 @@ class Generator_F2S(nn.Module):
         for _ in range(2):
             # 3x3 transpose convolution with in_features input channels and out_features output channels, stride=2
             model += [
-                nn.ConvTranspose2d(in_features, out_features, 3, stride=2, padding=1, output_padding=1),
+                nn.ConvTranspose2d(
+                    in_features, out_features, 3, stride=2, padding=1, output_padding=1
+                ),
                 # Instance normalization on the convolutional output
                 nn.InstanceNorm2d(out_features),
                 # Apply the ReLU activation function in place
-                nn.ReLU(inplace=True)
+                nn.ReLU(inplace=True),
             ]
             in_features = out_features
             out_features = in_features // 2
@@ -161,7 +168,7 @@ class Generator_F2S(nn.Module):
             # Pad the input tensor with reflection padding of size 3
             nn.ReflectionPad2d(3),
             # 7x7 convolution with 64 input channels and output_nc output channels
-            nn.Conv2d(64, output_nc, 7)
+            nn.Conv2d(64, output_nc, 7),
             # Tanh activation function is typically used to scale outputs between -1 and 1
             # nn.Tanh()
         ]
@@ -172,7 +179,10 @@ class Generator_F2S(nn.Module):
     # Forward method defining the forward pass of the generator
     def forward(self, x, mask):
         # Return the sum of the generator model output and the input tensor, scaled by Tanh activation
-         return (self.model(torch.cat((x, mask), 1)) + x).tanh() #(min=-1, max=1) #just learn a residual
+        return (
+            self.model(torch.cat((x, mask), 1)) + x
+        ).tanh()  # (min=-1, max=1) #just learn a residual
+
 
 # Define a Discriminator class that inherits from nn.Module
 class Discriminator(nn.Module):
@@ -187,7 +197,7 @@ class Discriminator(nn.Module):
         model = [
             nn.Conv2d(input_nc, 64, 4, stride=2, padding=1),
             # Leaky ReLU activation with a negative slope of 0.2, inplace operation
-            nn.LeakyReLU(0.2, inplace=True)
+            nn.LeakyReLU(0.2, inplace=True),
         ]
 
         # Convolutional layer with 64 input channels, 128 output channels, 4x4 kernel, stride=2, padding=1
@@ -196,7 +206,7 @@ class Discriminator(nn.Module):
             # Instance normalization on the convolutional output
             nn.InstanceNorm2d(128),
             # Leaky ReLU activation with a negative slope of 0.2, inplace operation
-            nn.LeakyReLU(0.2, inplace=True)
+            nn.LeakyReLU(0.2, inplace=True),
         ]
 
         # Convolutional layer with 128 input channels, 256 output channels, 4x4 kernel, stride=2, padding=1
@@ -205,7 +215,7 @@ class Discriminator(nn.Module):
             # Instance normalization on the convolutional output
             nn.InstanceNorm2d(256),
             # Leaky ReLU activation with a negative slope of 0.2, inplace operation
-            nn.LeakyReLU(0.2, inplace=True)
+            nn.LeakyReLU(0.2, inplace=True),
         ]
 
         # Convolutional layer with 256 input channels, 512 output channels, 4x4 kernel, padding=1
@@ -214,7 +224,7 @@ class Discriminator(nn.Module):
             # Instance normalization on the convolutional output
             nn.InstanceNorm2d(512),
             # Leaky ReLU activation with a negative slope of 0.2, inplace operation
-            nn.LeakyReLU(0.2, inplace=True)
+            nn.LeakyReLU(0.2, inplace=True),
         ]
 
         # Fully connected convolutional (FCN) layer for classification
@@ -228,3 +238,19 @@ class Discriminator(nn.Module):
         x = self.model(x)
         # Average pooling and flatten the output for global average pooling
         return F.avg_pool2d(x, x.size()[2:]).view(x.size()[0], -1)  # global avg pool
+
+
+class TransferLearningGenerator(nn.Module):
+    def __init__(self, pretrained_generator, new_output_nc):
+        super(TransferLearningGenerator, self).__init__()
+        self.pretrained_generator = pretrained_generator
+        # Modify the last layer for the new task
+        self.new_task_layer = nn.Conv2d(64, new_output_nc, 7)
+
+    def forward(self, x, mask):
+        # Use the pre-trained generator up to the last layer
+        features = self.pretrained_generator.model(torch.cat((x, mask), 1))
+        # Pass the features through the new task layer
+        output = self.new_task_layer(features)
+        # Use Tanh activation
+        return output.tanh()

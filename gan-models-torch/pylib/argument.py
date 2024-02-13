@@ -19,25 +19,26 @@ def _serialization_wrapper(func):
         if to_yaml:
             args_to_yaml(to_yaml, namespace)
         return namespace
+
     return _wrapper
 
 
 def str2bool(v):
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+    if v.lower() in ("yes", "true", "t", "y", "1"):
         return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+    elif v.lower() in ("no", "false", "f", "n", "0"):
         return False
     else:
-        raise argparse.ArgumentTypeError('Boolean value expected!')
+        raise argparse.ArgumentTypeError("Boolean value expected!")
 
 
 def argument(*args, **kwargs):
     """Wrap argparse.add_argument."""
-    if 'type'in kwargs:
-        if issubclass(kwargs['type'], bool):
-            kwargs['type'] = str2bool
-        elif issubclass(kwargs['type'], dict):
-            kwargs['type'] = json.loads
+    if "type" in kwargs:
+        if issubclass(kwargs["type"], bool):
+            kwargs["type"] = str2bool
+        elif issubclass(kwargs["type"], dict):
+            kwargs["type"] = json.loads
     return GLOBAL_COMMAND_PARSER.add_argument(*args, **kwargs)
 
 
@@ -62,7 +63,9 @@ def args_from_xxx(obj, parser, check=True):
 
     """
     dict_ = parser(obj)
-    namespace = argparse.ArgumentParser().parse_args(args='')  # '' for not to accept command line args
+    namespace = argparse.ArgumentParser().parse_args(
+        args=""
+    )  # '' for not to accept command line args
     for k, v in dict_.items():
         namespace.__setattr__(k, v)
     return namespace
