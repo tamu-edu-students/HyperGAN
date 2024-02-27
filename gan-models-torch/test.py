@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from PIL import Image
 import tqdm
 from dataset.maskshadow_dataset import MaskImageDataset
+from dataset.hyperspectral_dataset import HyperspectralImageDataset
 import queue
 import torchvision.transforms as transforms
 from io import BytesIO
@@ -24,25 +25,35 @@ if __name__ == "__main__":
     warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
     opt = TestOptions().parse()
 
+    # transforms_ = [
+    #     transforms.Resize((opt.crop_size, opt.crop_size), Image.BICUBIC),
+    #     # transforms.Resize(int(opt.crop_size * 1.12), Image.Resampling.BICUBIC),
+    #     # transforms.RandomCrop(opt.crop_size),
+    #     transforms.ToTensor(),
+    #     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    # ]
+    # dataloader = DataLoader(
+    #     MaskImageDataset(
+    #         opt.datasets_dir,
+    #         opt.dataroot,
+    #         transforms_=transforms_,
+    #         unaligned=True,
+    #         mode="test",
+    #     ),
+    #     batch_size=opt.batch_size,
+    #     shuffle=opt.shuffle,
+    #     num_workers=opt.n_cpu,
+    # )
+
+    mean_values = np.array([0.5] * opt.input_nc)  # input_nc channels with a mean of 0.5
+    std_values = np.array([0.5] * opt.input_nc)   # input_nc channels with a standard deviation of 0.5
+
     transforms_ = [
-        transforms.Resize((opt.crop_size, opt.crop_size), Image.BICUBIC),
-        # transforms.Resize(int(opt.crop_size * 1.12), Image.Resampling.BICUBIC),
-        # transforms.RandomCrop(opt.crop_size),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean_values.tolist(), std_values.tolist())
     ]
-    dataloader = DataLoader(
-        MaskImageDataset(
-            opt.datasets_dir,
-            opt.dataroot,
-            transforms_=transforms_,
-            unaligned=True,
-            mode="test",
-        ),
-        batch_size=opt.batch_size,
-        shuffle=opt.shuffle,
-        num_workers=opt.n_cpu,
-    )
+    dataloader = DataLoader(HyperspectralImageDataset(opt.datasets_dir, opt.dataroot, True, transforms_=transforms_, unaligned=True, mode='test'),
+                batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
 
     model = create_model(opt)
     model.data_length = len(dataloader.dataset)

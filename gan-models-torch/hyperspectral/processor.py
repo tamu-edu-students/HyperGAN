@@ -43,8 +43,7 @@ class Processor:
                 self.hsi_data = src.read()
 
             self.hsi_data = self.genArray()
-            print(self.hsi_data.shape)
-            self.hsi_data = self.hyperCrop(self.hsi_data, 256)
+            self.hsi_data = self.hyperCrop2D(self.hsi_data, 256,256)
             self.bands, self.rows, self.cols = self.hsi_data.shape
 
         if img_path.find("cu3") != -1:  # open file if in cubert format
@@ -57,10 +56,6 @@ class Processor:
             print("bands: ", self.bands, " rows: ", self.rows, " cols: ", self.cols)
 
         if img_path.find("hdr") != -1:
-
-            # shape = (3, 290, 275)
-            # self.hsi_data = np.random.rand(*shape)
-            # Generate random noise in the range [0, 1]
 
             img_path_data = img_path[:-4]
             img = envi.open(
@@ -79,12 +74,12 @@ class Processor:
             self.bands, self.rows, self.cols = self.hsi_data.shape
 
         return self.hsi_data  # returns data
+    
+    def hyperCrop2D(self, arr, target_dimX, target_dimY):
 
-    def hyperCrop(self, arr, target_dim):
-
-        target_shape = (target_dim, target_dim)  # input crop sizes
+        target_shape = (target_dimX, target_dimY)  # input crop sizes
         rec_array = np.empty(
-            (target_dim, target_dim, arr.shape[2]), dtype=np.float32
+            (target_dimX, target_dimY, arr.shape[2]), dtype=np.float32
         )  # empty 3D array
         arr_list = []
 
@@ -240,9 +235,10 @@ class Processor:
 #         return arr_list
 
 
-p = Processor()
-p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
-p.genFalseRGB(visualize=True)
+# p = Processor()
+# p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
+# print(p.hsi_data.shape)
+# p.genFalseRGB(visualize=True)
 # cropped_region = p.hsi_data[10:75, 12:24, :]
 # print(cropped_region.shape)
 # average_hyper = np.mean(cropped_region, axis=(0, 1))

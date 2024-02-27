@@ -45,6 +45,8 @@ if __name__ == '__main__':
         model.forward()
         pil_real_A, pil_fake_B, spec_real_A, spec_fake_B = model.get_visuals(iters)
 
+        model.save_mask()
+
         p = processor.Processor()
         p.prepare_data(r'datasets/hsi_rmse/ref/session_000_001k_044_snapshot_cube.tiff')
         real_B = p.genFalseRGB(convertPIL=True)
