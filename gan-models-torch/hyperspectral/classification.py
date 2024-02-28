@@ -2,64 +2,118 @@ import numpy as np
 import pysptools.distance as distance
 import os
 import math
+import torch
 
 
 class Objective:
     
     def __init__(self):
-        None
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.use_gpu = True if torch.cuda.is_available() else False
     
     def SAM(self, ref, input):
-        return distance.SAM(ref, input)
-    
+
+        if self.use_gpu:
+            try:
+                s1_tensor = torch.tensor(ref, dtype=torch.float32).to(self.device)
+                s2_tensor = torch.tensor(input, dtype=torch.float32).to(self.device)
+                s1_norm = torch.norm(s1_tensor)
+                s2_norm = torch.norm(s2_tensor)
+                sum_s1_s2 = torch.dot(s1_tensor, s2_tensor)
+                angle = torch.acos(sum_s1_s2 / (s1_norm * s2_norm)).cpu().numpy()
+            except ValueError:
+                # PyTorch doesn't like when acos is called with
+                # a value very near to 1
+                return 0.0
+            return angle.item()
+        else:
+            return distance.SAM(ref, input)
+
+
     def SID(self, ref, input):
-        return distance.SID(ref, input)
+        
+        if self.use_gpu:
+            s1 = torch.tensor(ref).to(self.device)
+            s2 = torch.tensor(input).to(self.device)
+            p = (s1 / torch.sum(s1)) + np.spacing(1)
+            q = (s2 / torch.sum(s2)) + np.spacing(1)
+            return torch.sum(p * torch.log(p / q) + q * torch.log(q / p)).item()
+        else:
+            return distance.SID(ref, input)
 
     def SAD(self, ref, input):
-    
-        vector1 = np.asarray(ref)
-        vector2 = np.asarray(input)
+        if self.use_gpu:
+            ref_tensor = torch.tensor(ref, dtype=torch.float32).to(self.device)
+            input_tensor = torch.tensor(input, dtype=torch.float32).to(self.device)
+            dot_product = torch.dot(ref_tensor, input_tensor)
+            magnitude_ref = torch.norm(ref_tensor)
+            magnitude_input = torch.norm(input_tensor)
+            spectral_angle = dot_product / (magnitude_ref * magnitude_input)
+            spectral_angle = torch.clamp(spectral_angle, -1, 1)  # Clip to valid range
+            return torch.acos(spectral_angle).item()
+        else:
+            vector1 = np.asarray(ref)
+            vector2 = np.asarray(input)
+            dot_product = np.dot(vector1, vector2)
+            magnitude1 = np.linalg.norm(vector1)
+            magnitude2 = np.linalg.norm(vector2)
+            spectral_angle = dot_product / (magnitude1 * magnitude2)
+            spectral_angle = np.clip(spectral_angle, -1, 1)
+            return np.arccos(spectral_angle)        
 
-        dot_product = np.dot(vector1, vector2)
 
-        magnitude1 = np.linalg.norm(vector1)
-        magnitude2 = np.linalg.norm(vector2)
+    def SCM(self, ref, input, to_min=False):
+        if self.use_gpu:
+            ref_spectrum = torch.tensor(ref, dtype=torch.float32)
+            pixel_spectrum = torch.tensor(input, dtype=torch.float32)
+            mean1 = torch.mean(pixel_spectrum)
+            mean2 = torch.mean(ref_spectrum)
+            sum1 = torch.sum((pixel_spectrum - mean1) * (ref_spectrum - mean2))
+            sum2 = torch.sum((pixel_spectrum - mean1) ** 2)
+            sum3 = torch.sum((ref_spectrum - mean2) ** 2)
 
-        spectral_angle = dot_product / (magnitude1 * magnitude2)
+            if sum2 <= 0 or sum3 <= 0:
+                return -1  # set to white due to an error
 
-        spectral_angle = np.clip(spectral_angle, -1, 1)
+            scm_val = (sum1 / torch.sqrt(sum2 * sum3)).item()
+            
+        else:
+            ref_spectrum = np.asarray(ref)
+            pixel_spectrum = np.asarray(input)   
+            sum1, sum2, sum3, mean1, mean2 = 0, 0, 0, 0, 0
+            num_layers = ref_spectrum.size
+            mean1 = np.mean(pixel_spectrum)
+            mean2 = np.mean(ref_spectrum)
+            sum1 = np.sum((pixel_spectrum - mean1) * (ref_spectrum - mean2))
+            sum2 = np.sum((pixel_spectrum - mean1) ** 2)
+            sum3 = np.sum((ref_spectrum - mean2) ** 2)
 
-        return np.arccos(spectral_angle)
-    
-    def SCM(self, ref, input):
-        ref_spectrum = np.asarray(ref)
-        pixel_spectrum = np.asarray(input)
-        
-        sum1, sum2, sum3, mean1, mean2 = 0, 0, 0, 0, 0
-        num_layers = ref_spectrum.size
-        
-        mean1 = np.mean(pixel_spectrum)
-        mean2 = np.mean(ref_spectrum)
+            if sum2 <= 0 or sum3 <= 0:
+                return -1  # set to white due to an error
 
-        sum1 = np.sum((pixel_spectrum - mean1) * (ref_spectrum - mean2))
-        sum2 = np.sum((pixel_spectrum - mean1) ** 2)
-        sum3 = np.sum((ref_spectrum - mean2) ** 2)
+            scm_val = sum1 / math.sqrt(sum2 * sum3)
 
-        if sum2 <= 0 or sum3 <= 0:
-            return -1  # set to white due to an error
-
-        scm_val = sum1 / math.sqrt(sum2 * sum3)
-
-        return scm_val*-1
+        if to_min:
+            return scm_val*-1
+        else:
+            return scm_val
     
     def EUD(self, ref, input):
-        ref_spectrum = np.asarray(ref)
-        pixel_spectrum = np.asarray(input)
         
-        sum_squared_diff = np.sum((ref_spectrum - pixel_spectrum) ** 2)
-        
-        return np.sqrt(sum_squared_diff)
+        if self.use_gpu:
+            ref_spectrum = torch.tensor(ref, dtype=torch.float32)
+            pixel_spectrum = torch.tensor(input, dtype=torch.float32)
+            
+            sum_squared_diff = torch.sum((ref_spectrum - pixel_spectrum) ** 2)
 
+            return torch.sqrt(sum_squared_diff).item()
+        else:
+            ref_spectrum = np.asarray(ref)
+            pixel_spectrum = np.asarray(input)
+            
+            sum_squared_diff = np.sum((ref_spectrum - pixel_spectrum) ** 2)
+            
+            return np.sqrt(sum_squared_diff)
 
 
 class Classify:
@@ -76,7 +130,7 @@ class Classify:
         if evaluation == 'SAM':
             self.evaluator = objective.SAM
         if evaluation == 'SCM':
-            self.evaluator = objective.SCM
+            self.evaluator = objective.SCM(to_min=True)
         if evaluation == 'EUD':
             self.evaluator = objective.EUD
     
