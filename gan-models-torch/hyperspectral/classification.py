@@ -121,6 +121,7 @@ class Classify:
     def __init__(self, evaluation='SAD') -> None:
         
         objective = Objective()
+        self.evaluation = evaluation
         self.evaluator = None
 
         if evaluation == 'SAD':
@@ -130,7 +131,7 @@ class Classify:
         if evaluation == 'SAM':
             self.evaluator = objective.SAM
         if evaluation == 'SCM':
-            self.evaluator = objective.SCM(to_min=True)
+            self.evaluator = objective.SCM
         if evaluation == 'EUD':
             self.evaluator = objective.EUD
     
@@ -153,6 +154,25 @@ class Classify:
     
     def compute_divergence_measure(self, target, ref):
         return self.evaluator(target, ref)
+
+    def find_best_patch(self, orig, replacement_patches, replacement_locations):
+        
+        assert len(replacement_patches) == len(replacement_locations), "Arrays are not the same size"
+
+        best_candidate = None
+        best_candidate_loc = None
+        best_score = np.iinfo(np.uint8).max
+
+        for i in range(len(replacement_patches)):
+            curr_score = self.evaluator(orig, replacement_patches[i], to_min=True) 
+            if curr_score < best_score:
+                best_candidate = replacement_patches[i]
+                best_candidate_loc = replacement_locations[i]
+                best_score = curr_score
+        
+        return best_candidate, best_candidate_loc
+        
+
     
 
 

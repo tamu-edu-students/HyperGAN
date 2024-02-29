@@ -235,9 +235,9 @@ class Processor:
 #         return arr_list
 
 
-# p = Processor()
-# p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
-# print(p.hsi_data.shape)
+p = Processor()
+p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
+print(p.hsi_data.shape)
 # p.genFalseRGB(visualize=True)
 # cropped_region = p.hsi_data[10:75, 12:24, :]
 # print(cropped_region.shape)

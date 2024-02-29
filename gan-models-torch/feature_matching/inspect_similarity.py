@@ -97,8 +97,8 @@ def show_similarity_interactive(image_path_a: str, image_path_b: str, load_size:
         center = ((x_descs_coor - 1) * stride + stride + patch_size // 2 - .5,
                   (y_descs_coor - 1) * stride + stride + patch_size // 2 - .5)
         
-        print("dis is the chosen point", x_coor, "and ", y_coor)
-        print("dis is the center", center)
+        print("this is the chosen point", x_coor, "and ", y_coor)
+        print("this is the center", center)
         patch = plt.Circle(center, radius, color=(1, 0, 0, 0.75))
         axes[0].add_patch(patch)
         visible_patches.append(patch)

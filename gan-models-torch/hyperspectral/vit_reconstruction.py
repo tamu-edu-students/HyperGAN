@@ -6,7 +6,10 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import time
 import cv2
+import math
 from PIL import Image
+from classification import Classify
+from processor import Processor
 
 def chunk_cosine_sim(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     """ Computes cosine similarity between all possible pairs in two sets of vectors.
@@ -38,13 +41,17 @@ def shadow_sim_iter(image_path: str, reconstruction_set, shadow_map, load_size: 
     descs_b = extractor.extract_descriptors(image_batch_b.to(device), layer, facet, bin, include_cls=True)
     similarities = chunk_cosine_sim(descs_a, descs_b)
 
+    p = Processor()
+    hsi_data = p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
+    hsi_data = p.hyperCrop2D(hsi_data, 236, 224)
 
     for i, j in reconstruction_set:
-        similarities_map(i,j,similarities, shadow_map, extractor, num_sim_patches=7)
+        candidate_patches = similarity_finder(i,j,similarities, shadow_map, hsi_data, extractor, num_sim_patches=7)
+        
 
 
 
-def similarities_map(x_coor, y_coor, similarities, shadow_map, extractor, stride: int = 4, num_sim_patches: int = 1):
+def similarity_finder(x_coor, y_coor, similarities, shadow_map, hsi_data, extractor, stride: int = 4, num_sim_patches: int = 1):
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(x_coor, ": xcoordinate ",y_coor , " : ycoordinate" )
@@ -83,48 +90,57 @@ def similarities_map(x_coor, y_coor, similarities, shadow_map, extractor, stride
         center = ((x_descs_coor - 1) * stride + stride + patch_size // 2 - .5,
                     (y_descs_coor - 1) * stride + stride + patch_size // 2 - .5)
         box_coords.append(center)
-
-    # fig, axes = plt.subplots(1, 4, figsize=(15, 5))
-    # shadow_mas = shadow_map.cpu().numpy()
-    # # Plot the first image (leftmost)
-    # axes[0].imshow(shadow_mas, cmap='gray', interpolation='nearest')
-    # axes[0].set_title('Image 1')
-    # x_orig, y_orig = center_orig
-    # #center_orig = (center_orig[0].cpu(),center_orig[1].cpu())
-    # print(center_orig, "to check")
-    # axes[0].add_patch(plt.Rectangle((orig_x_patch_coord-0.5, orig_y_patch_coord-0.5), 1, 1, linewidth=2, edgecolor='b', facecolor='none'))
-
-    # # Plot the second image (middle)
-    # axes[1].imshow((curr_similarities.flatten()-shadow_map.flatten()).reshape(num_patches_b).cpu().numpy(), cmap='jet')
-    # axes[1].set_title('Image 2')
-
-    # # Plot the third image (rightmost)
-    # origimage = Image.open('datasets/export_3/trainA/13_rgb.png')
-    # # Resize the image
-    # resized_image = origimage.resize((236, 224), Image.BICUBIC)
-    # axes[2].imshow(resized_image)
-    # axes[2].set_title('Image 3')
     
-    # print(type(box_coords[0][0]))
-    # # Draw a box on the first image at specified coordinates
-    # for x, y in box_coords:
-    #     x = x.cpu()
-    #     y = y.cpu()
-    #     axes[2].add_patch(plt.Rectangle((x - 2, y - 2), 4, 4, linewidth=2, edgecolor='r', facecolor='none'))
-    #     axes[2].add_patch(plt.Rectangle((x_orig-2, y_orig-2), 4, 4, linewidth=2, edgecolor='b', facecolor='none'))
+    #return box_coords
+        
+    floor_center_orig = tuple(math.floor(val) for val in center_orig)
+    box_coords = np.array([[math.floor(val) for val in tpl] for tpl in box_coords])
 
-    # shadow_im = Image.open('datasets/shadow_masks/13_mask.png')
-    # shadow_im = shadow_im.resize((236,224), Image.BICUBIC)
-    # axes[3].imshow(shadow_im)
-    # axes[3].set_title('Image 4')
-    # axes[3].add_patch(plt.Rectangle((x_orig-2, y_orig-2), 4, 4, linewidth=2, edgecolor='b', facecolor='none'))
+    print("center orig is", center_orig)
+    _, best_candidate_loc = spectral_replacement_evaluator(hsi_data, floor_center_orig, box_coords, patch_size)
+    print("best candidate found to be ", best_candidate_loc)
+    fig, axes = plt.subplots(1, 4, figsize=(15, 5))
+    shadow_mas = shadow_map.cpu().numpy()
+    # Plot the first image (leftmost)
+    axes[0].imshow(shadow_mas, cmap='gray', interpolation='nearest')
+    axes[0].set_title('Image 1')
+    x_orig, y_orig = center_orig
+    #center_orig = (center_orig[0].cpu(),center_orig[1].cpu())
+    print(center_orig, "to check")
+    axes[0].add_patch(plt.Rectangle((orig_x_patch_coord-0.5, orig_y_patch_coord-0.5), 1, 1, linewidth=2, edgecolor='b', facecolor='none'))
 
-    # # Hide axis for all subplots
-    # for ax in axes:
-    #     ax.axis('off')
+    # Plot the second image (middle)
+    axes[1].imshow((curr_similarities.flatten()-shadow_map.flatten()).reshape(num_patches_b).cpu().numpy(), cmap='jet')
+    axes[1].set_title('Image 2')
 
-    # plt.tight_layout()
-    # plt.show()
+    # Plot the third image (rightmost)
+    origimage = Image.open('datasets/export_3/trainA/13_rgb.png')
+    # Resize the image
+    resized_image = origimage.resize((236, 224), Image.BICUBIC)
+    axes[2].imshow(resized_image)
+    axes[2].set_title('Image 3')
+    
+    best_x, best_y = best_candidate_loc
+    # Draw a box on the first image at specified coordinates
+    for x, y in box_coords:
+        # x = x.cpu()
+        # y = y.cpu()
+        axes[2].add_patch(plt.Rectangle((x - 2, y - 2), 4, 4, linewidth=2, edgecolor='r', facecolor='none'))
+        axes[2].add_patch(plt.Rectangle((x_orig-2, y_orig-2), 4, 4, linewidth=2, edgecolor='b', facecolor='none'))
+        axes[2].add_patch(plt.Rectangle((best_x-2, best_y-2), 4, 4, linewidth=2, edgecolor='g', facecolor='none'))
+
+    shadow_im = Image.open('datasets/shadow_masks/13_mask.png')
+    shadow_im = shadow_im.resize((236,224), Image.BICUBIC)
+    axes[3].imshow(shadow_im)
+    axes[3].set_title('Image 4')
+    axes[3].add_patch(plt.Rectangle((x_orig-2, y_orig-2), 4, 4, linewidth=2, edgecolor='b', facecolor='none'))
+
+    # Hide axis for all subplots
+    for ax in axes:
+        ax.axis('off')
+
+    plt.tight_layout()
+    plt.show()
 
 
 def shadow_patches(shadow_mask, patch_size=4, threshold=128):
@@ -149,6 +165,23 @@ def shadow_patches(shadow_mask, patch_size=4, threshold=128):
     print(binary_image.shape)
     return binary_image, shadow_indxs
 
+def spectral_replacement_evaluator(hsi, orig_loc, patches_loc, patch_size):
+    
+    classifier = Classify(evaluation='SCM')
+    
+    center_x, center_y = orig_loc
+    start_x = center_x - patch_size // 2
+    start_y = center_y - patch_size // 2
+    
+    orig_patch = hsi[start_x:start_x+patch_size, start_y:start_y+patch_size, :]
+    candidate_patches = []
+    for x,y in patches_loc:
+        candidate_test_x = x - patch_size // 2
+        candidate_test_y = y - patch_size // 2
+        candidate_patches.append(hsi[candidate_test_x:candidate_test_x+patch_size, candidate_test_y:candidate_test_y+patch_size, :])
+    
+    return classifier.find_best_patch(orig_patch, candidate_patches, patches_loc)
+
 
 if __name__ == '__main__':
     
@@ -158,24 +191,11 @@ if __name__ == '__main__':
     # plt.show()
     patch_mask, rec_indxs = shadow_patches(np.array(shadow_mask))
 
-    plt.imshow(patch_mask, cmap='gray', interpolation='nearest')
-    plt.axis('off')  # Turn off axis
-    plt.show()
-
-
-    # # Define the coordinates of the box
-    # x_start, x_end = 205, 215
-    # y_start, y_end = 140, 160
-
-    # pixel_array = np.empty((y_end - y_start + 1, x_end - x_start + 1), dtype=object)
-
-    # for y in range(y_start, y_end + 1):
-    #     for x in range(x_start, x_end + 1):
-    #         pixel_array[y - y_start, x - x_start] = (x, y)
+    # plt.imshow(patch_mask, cmap='gray', interpolation='nearest')
+    # plt.axis('off')  # Turn off axis
+    # plt.show()
     
     start_time = time.time()
-
-
     with torch.no_grad():
         shadow_sim_iter(r'datasets/export_3/trainA/13_rgb.png', rec_indxs, patch_mask)
 
