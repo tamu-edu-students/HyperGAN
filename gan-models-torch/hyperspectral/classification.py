@@ -9,7 +9,8 @@ class Objective:
     
     def __init__(self):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.use_gpu = True if torch.cuda.is_available() else False
+        self.use_gpu = False 
+        #True if torch.cuda.is_available() else False
     
     def SAM(self, ref, input):
 
@@ -147,8 +148,10 @@ class Classify:
             index of min element
         """
         scores = {}
+        
         for label, val in ref_list.items():
-            scores[label] = self.evaluator(val, input) 
+            args = (val, input, True) if self.evaluation == 'SCM' else (val, input) 
+            scores[label] = self.evaluator(*args) 
         
         return min(scores, key=lambda k: scores[k])
     

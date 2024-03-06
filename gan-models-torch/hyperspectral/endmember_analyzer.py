@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
 from processor import Processor
+import tifffile
 
 class EndmemberAnalyzer:
     def __init__(self, root):
@@ -62,7 +63,16 @@ class EndmemberAnalyzer:
         if self.image_path:
             # Load image and display on canvas
             if self.image_path.find('.tif') != -1:  
-                self.p.prepare_data(self.image_path)
+                # self.p.prepare_data(self.image_path)
+                with tifffile.TiffFile(self.image_path) as tif:
+                    data = tif.asarray()
+                    dims = np.array(data.shape)
+                    if np.where(dims == min(dims)) != 2:
+                        data = np.transpose(data, (2,0,1))                 
+
+                print(data.shape)
+                self.p = Processor(hsi_data=data)
+                self.p.hsi_data = self.p.genArray()
                 self.img = self.p.genFalseRGB(convertPIL=True)
                 print(self.p.hsi_data.shape)
             else:

@@ -48,3 +48,13 @@ def segment_image(hsi, endmembers, similarity_measure='SCM', visualize=True):
 
     return numerical_array
 
+def lightness_mapping(hsi, method='geo_avg'):
+    """
+    inputs:
+        hsi (np.array) - hyperspectral cube as a 3D numpy array
+        method (str) - method for producing lightness map
+                            geo_avg - geometric mean
+                            eucl_norm - euclidean norm
+                            avg - average
+    """
+    None

@@ -10,6 +10,10 @@ import math
 from PIL import Image
 from classification import Classify
 from processor import Processor
+from scipy.ndimage import zoom
+import tifffile
+from util.eval_metrics import calculate_rmse, SSIM
+from classification import Objective
 
 def chunk_cosine_sim(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     """ Computes cosine similarity between all possible pairs in two sets of vectors.
@@ -27,12 +31,13 @@ def chunk_cosine_sim(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     return torch.stack(result_list, dim=2)  # Bx1x(t_x)x(t_y)
 
 
-def shadow_sim_iter(image_path: str, reconstruction_set, shadow_map, load_size: int = 224, layer: int = 11,
+def shadow_sim_iter(image_path: str, hsi_data, reconstruction_set, shadow_map, load_size: int = 224, layer: int = 11,
                                 facet: str = 'key', bin: bool = False, stride: int = 4, model_type: str = 'dino_vits8'):
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     extractor = ViTExtractor(model_type, stride, device=device)
     extractor.model = extractor.patch_vit_resolution(extractor.model, 4)
+    patch_size = extractor.model.patch_embed.patch_size
 
     image_batch_a, image_pil_a = extractor.preprocess(image_path, load_size)
     print(image_batch_a.shape)
@@ -41,14 +46,13 @@ def shadow_sim_iter(image_path: str, reconstruction_set, shadow_map, load_size: 
     descs_b = extractor.extract_descriptors(image_batch_b.to(device), layer, facet, bin, include_cls=True)
     similarities = chunk_cosine_sim(descs_a, descs_b)
 
-    p = Processor()
-    hsi_data = p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
-    hsi_data = p.hyperCrop2D(hsi_data, 236, 224)
+    hsi_refined = hsi_data
 
     for i, j in reconstruction_set:
-        candidate_patches = similarity_finder(i,j,similarities, shadow_map, hsi_data, extractor, num_sim_patches=7)
+        best_candidate_loc, center_orig = similarity_finder(i,j,similarities, shadow_map, hsi_data, extractor, num_sim_patches=7)
+        hsi_refined = replace_spectra(hsi_refined, center_orig, best_candidate_loc)
         
-
+    return hsi_refined
 
 
 def similarity_finder(x_coor, y_coor, similarities, shadow_map, hsi_data, extractor, stride: int = 4, num_sim_patches: int = 1):
@@ -77,6 +81,9 @@ def similarity_finder(x_coor, y_coor, similarities, shadow_map, hsi_data, extrac
     curr_similarities = similarities[0, 0, reveled_desc_idx_including_cls, 1:]
     curr_similarities = curr_similarities.reshape(num_patches_b)
 
+    print(curr_similarities.shape)
+    print("and", shadow_map.flatten().shape)
+
     shadow_map = torch.tensor(shadow_map).to(device)
     #Subtract shadow map binary values, after converting to torch tensor so that similat
     sims, idxs = torch.topk(curr_similarities.flatten()-10*shadow_map.flatten(), num_sim_patches)
@@ -97,50 +104,52 @@ def similarity_finder(x_coor, y_coor, similarities, shadow_map, hsi_data, extrac
     box_coords = np.array([[math.floor(val) for val in tpl] for tpl in box_coords])
 
     print("center orig is", center_orig)
-    _, best_candidate_loc = spectral_replacement_evaluator(hsi_data, floor_center_orig, box_coords, patch_size)
+    _, best_candidate_loc = spectral_replacement_evaluator(hsi_data, floor_center_orig, box_coords)
     print("best candidate found to be ", best_candidate_loc)
-    fig, axes = plt.subplots(1, 4, figsize=(15, 5))
-    shadow_mas = shadow_map.cpu().numpy()
-    # Plot the first image (leftmost)
-    axes[0].imshow(shadow_mas, cmap='gray', interpolation='nearest')
-    axes[0].set_title('Image 1')
-    x_orig, y_orig = center_orig
-    #center_orig = (center_orig[0].cpu(),center_orig[1].cpu())
-    print(center_orig, "to check")
-    axes[0].add_patch(plt.Rectangle((orig_x_patch_coord-0.5, orig_y_patch_coord-0.5), 1, 1, linewidth=2, edgecolor='b', facecolor='none'))
+    # fig, axes = plt.subplots(1, 4, figsize=(15, 5))
+    # shadow_mas = shadow_map.cpu().numpy()
+    # # Plot the first image (leftmost)
+    # axes[0].imshow(shadow_mas, cmap='gray', interpolation='nearest')
+    # axes[0].set_title('Image 1')
+    # x_orig, y_orig = center_orig
+    # #center_orig = (center_orig[0].cpu(),center_orig[1].cpu())
+    # print(center_orig, "to check")
+    # axes[0].add_patch(plt.Rectangle((orig_x_patch_coord-0.5, orig_y_patch_coord-0.5), 1, 1, linewidth=2, edgecolor='b', facecolor='none'))
 
-    # Plot the second image (middle)
-    axes[1].imshow((curr_similarities.flatten()-shadow_map.flatten()).reshape(num_patches_b).cpu().numpy(), cmap='jet')
-    axes[1].set_title('Image 2')
+    # # Plot the second image (middle)
+    # axes[1].imshow((curr_similarities.flatten()-shadow_map.flatten()).reshape(num_patches_b).cpu().numpy(), cmap='jet')
+    # axes[1].set_title('Image 2')
 
-    # Plot the third image (rightmost)
-    origimage = Image.open('datasets/export_3/trainA/13_rgb.png')
-    # Resize the image
-    resized_image = origimage.resize((236, 224), Image.BICUBIC)
-    axes[2].imshow(resized_image)
-    axes[2].set_title('Image 3')
+    # # Plot the third image (rightmost)
+    # origimage = Image.open('datasets/export_3/trainA/13_rgb.png')
+    # # Resize the image
+    # resized_image = origimage.resize((236, 224), Image.BICUBIC)
+    # axes[2].imshow(resized_image)
+    # axes[2].set_title('Image 3')
     
-    best_x, best_y = best_candidate_loc
-    # Draw a box on the first image at specified coordinates
-    for x, y in box_coords:
-        # x = x.cpu()
-        # y = y.cpu()
-        axes[2].add_patch(plt.Rectangle((x - 2, y - 2), 4, 4, linewidth=2, edgecolor='r', facecolor='none'))
-        axes[2].add_patch(plt.Rectangle((x_orig-2, y_orig-2), 4, 4, linewidth=2, edgecolor='b', facecolor='none'))
-        axes[2].add_patch(plt.Rectangle((best_x-2, best_y-2), 4, 4, linewidth=2, edgecolor='g', facecolor='none'))
+    # best_x, best_y = best_candidate_loc
+    # # Draw a box on the first image at specified coordinates
+    # for x, y in box_coords:
+    #     # x = x.cpu()
+    #     # y = y.cpu()
+    #     axes[2].add_patch(plt.Rectangle((x - 2, y - 2), 4, 4, linewidth=2, edgecolor='r', facecolor='none'))
+    #     axes[2].add_patch(plt.Rectangle((x_orig-2, y_orig-2), 4, 4, linewidth=2, edgecolor='b', facecolor='none'))
+    #     axes[2].add_patch(plt.Rectangle((best_x-2, best_y-2), 4, 4, linewidth=2, edgecolor='g', facecolor='none'))
 
-    shadow_im = Image.open('datasets/shadow_masks/13_mask.png')
-    shadow_im = shadow_im.resize((236,224), Image.BICUBIC)
-    axes[3].imshow(shadow_im)
-    axes[3].set_title('Image 4')
-    axes[3].add_patch(plt.Rectangle((x_orig-2, y_orig-2), 4, 4, linewidth=2, edgecolor='b', facecolor='none'))
+    # shadow_im = Image.open('datasets/shadow_masks/13_mask.png')
+    # shadow_im = shadow_im.resize((236,224), Image.BICUBIC)
+    # axes[3].imshow(shadow_im)
+    # axes[3].set_title('Image 4')
+    # axes[3].add_patch(plt.Rectangle((x_orig-2, y_orig-2), 4, 4, linewidth=2, edgecolor='b', facecolor='none'))
 
-    # Hide axis for all subplots
-    for ax in axes:
-        ax.axis('off')
+    # # Hide axis for all subplots
+    # for ax in axes:
+    #     ax.axis('off')
 
-    plt.tight_layout()
-    plt.show()
+    # plt.tight_layout()
+    # plt.show()
+
+    return best_candidate_loc, floor_center_orig
 
 
 def shadow_patches(shadow_mask, patch_size=4, threshold=128):
@@ -165,22 +174,69 @@ def shadow_patches(shadow_mask, patch_size=4, threshold=128):
     print(binary_image.shape)
     return binary_image, shadow_indxs
 
-def spectral_replacement_evaluator(hsi, orig_loc, patches_loc, patch_size):
+def spectral_replacement_evaluator(hsi, orig_loc, patches_loc, stride=4):
     
     classifier = Classify(evaluation='SCM')
     
     center_x, center_y = orig_loc
-    start_x = center_x - patch_size // 2
-    start_y = center_y - patch_size // 2
+    start_x = center_x - stride // 2
+    start_y = center_y - stride // 2
     
-    orig_patch = hsi[start_x:start_x+patch_size, start_y:start_y+patch_size, :]
+    orig_patch = hsi[start_y:start_y+stride, start_x:start_x+stride,  :]
     candidate_patches = []
     for x,y in patches_loc:
-        candidate_test_x = x - patch_size // 2
-        candidate_test_y = y - patch_size // 2
-        candidate_patches.append(hsi[candidate_test_x:candidate_test_x+patch_size, candidate_test_y:candidate_test_y+patch_size, :])
-    
+        
+        candidate_test_x = x - stride // 2
+        candidate_test_y = y - stride // 2
+
+        print("patch location:", (candidate_test_y, candidate_test_y+stride), "amd", (candidate_test_x, candidate_test_x+stride))
+
+        candidate_patches.append(hsi[candidate_test_y:candidate_test_y+stride, candidate_test_x:candidate_test_x+stride, :])
+            
     return classifier.find_best_patch(orig_patch, candidate_patches, patches_loc)
+
+def replace_spectra(hsi, orig_loc, candidate_loc, patch_size=4):
+    
+    center_x, center_y = orig_loc
+    start_x = center_x - patch_size // 2
+    start_y = center_y - patch_size // 2
+
+    candidate_center_x, candidate_center_y = candidate_loc
+    candidate_start_x = candidate_center_x - patch_size // 2
+    candidate_start_y = candidate_center_y - patch_size // 2
+
+    print("SIZEEEE", hsi.shape)
+
+    hsi[start_y:start_y+patch_size, start_x:start_x+patch_size, :] = hsi[candidate_start_y:candidate_start_y+patch_size, candidate_start_x:candidate_start_x+patch_size, :]
+
+    return hsi
+
+def blur_where_mask(image, mask):
+    """
+    Blur the regions in the image where the mask value is 1.
+    
+    Parameters:
+        image (numpy.ndarray): Input image.
+        mask (numpy.ndarray): Binary mask indicating regions to blur (1 for regions to blur, 0 otherwise).
+    
+    Returns:
+        numpy.ndarray: Blurred image.
+    """
+    # Create a copy of the input image to store the result
+    blurred_image = image.copy()
+    
+    # Iterate over each pixel in the image
+    for y in range(image.shape[0]):
+        for x in range(image.shape[1]):
+            # Check if the mask value at this location is 1
+            if mask[y, x] == 1:
+                # Apply Gaussian blur to the 3x3 neighborhood around the pixel
+                roi = image[max(0, y-1):min(y+2, image.shape[0]), max(0, x-1):min(x+2, image.shape[1])]
+                blurred_roi = cv2.GaussianBlur(roi, (3, 3), 0)
+                # Update the corresponding region in the blurred image
+                blurred_image[max(0, y-1):min(y+2, image.shape[0]), max(0, x-1):min(x+2, image.shape[1])] = blurred_roi
+    
+    return blurred_image
 
 
 if __name__ == '__main__':
@@ -189,17 +245,155 @@ if __name__ == '__main__':
     shadow_mask = shadow_mask.resize((236,224), Image.BICUBIC)
     # plt.imshow(shadow_mask, cmap='gray')
     # plt.show()
-    patch_mask, rec_indxs = shadow_patches(np.array(shadow_mask))
+    shadow_mask = np.array(shadow_mask)
+    patch_mask, rec_indxs = shadow_patches(shadow_mask)
+
+    with tifffile.TiffFile(r'datasets/export_2/trainA/session_000_001k_027_snapshot_ref.tiff') as tif:
+        shadow_image = tif.asarray()
+
+    shadowP = Processor(hsi_data=shadow_image)
+    shadow_im = shadowP.hyperCrop2D(shadowP.hsi_data, 224, 236)
+
+    with tifffile.TiffFile('output/hsi_rmse/img-4.tiff') as tif:
+        image = tif.asarray()  # Convert the TIFF image to a numpy array
+    p = Processor(hsi_data=image)
+    #hsi_data = p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
+    hsi_data = p.hyperCrop2D(p.hsi_data, 224, 236)
+    init_image = p.genFalseRGB(convertPIL=True)
 
     # plt.imshow(patch_mask, cmap='gray', interpolation='nearest')
     # plt.axis('off')  # Turn off axis
     # plt.show()
-    
+    rgb_image_path = r'datasets/shadow_masks/13_gan.png'
+    img = Image.open(rgb_image_path)
+    resized_img = img.resize((290, 275))  # Specify the new dimensions\
+    resized_img.save(rgb_image_path)
+
     start_time = time.time()
+    hsi_resolved = None
     with torch.no_grad():
-        shadow_sim_iter(r'datasets/export_3/trainA/13_rgb.png', rec_indxs, patch_mask)
+        hsi_resolved = shadow_sim_iter(rgb_image_path, hsi_data, rec_indxs, patch_mask)
 
     end_time = time.time()
     elapsed_time = end_time - start_time
 
     print(f"Elapsed time: {elapsed_time} seconds")
+
+    p2 = Processor(hsi_resolved)
+    final_image = p2.genFalseRGB(convertPIL=True)
+
+    tifffile.imsave(r'datasets/shadow_masks/resolved_2.tiff', hsi_resolved)
+
+    final_image = np.array(final_image)
+    
+    # Apply Sobel filter in x and y directions
+    sobelx = cv2.Sobel(final_image, cv2.CV_64F, 1, 0, ksize=3)
+    sobely = cv2.Sobel(final_image, cv2.CV_64F, 0, 1, ksize=3)
+
+    # Calculate gradient magnitude
+    gradient_magnitude = np.sqrt(sobelx**2 + sobely**2)
+    # Normalize the gradient to convert to 8-bit image
+    gradient_normalized = cv2.normalize(gradient_magnitude, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+
+
+    sobel_channels = []
+    for channel in range(hsi_resolved.shape[2]):
+        sobelx = cv2.Sobel(hsi_resolved[:,:, channel], cv2.CV_64F, 1, 0, ksize=3)
+        sobely = cv2.Sobel(hsi_resolved[:,:, channel], cv2.CV_64F, 0, 1, ksize=3)
+        gradient_magnitude = np.sqrt(sobelx**2 + sobely**2)
+        sobel_channels.append(gradient_magnitude)
+
+    # Merge the channels back into a single multispectral image
+    sobel_multispectral_image = cv2.merge(sobel_channels)
+
+    sobel_gradient_combined = np.mean(sobel_channels, axis=0)
+
+    # # Display the gradient image
+    # cv2.imshow("Gradient Image", gradient_normalized)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    print(patch_mask.shape[0])
+    upsampling_factor_row = 224 / patch_mask.shape[0]
+    upsampling_factor_col = 236 / patch_mask.shape[1]
+
+    # Upsample the array using bicubic interpolation
+    upsampled_array = zoom(patch_mask, (upsampling_factor_row, upsampling_factor_col), order=3)
+
+    # Convert the upsampled array to uint8 if needed
+    upsampled_array = np.uint8(upsampled_array)
+
+    mask = ((sobel_gradient_combined*upsampled_array)>50).astype(np.uint8)
+
+    p3 = Processor()
+    p3.prepare_data(r'datasets/hsi_rmse/ref/session_000_001k_044_snapshot_cube.tiff')
+    hsi_data3 = p3.hyperCrop2D(p3.hsi_data, 224, 236)
+
+    
+
+
+
+    with tifffile.TiffFile('output/hsi_rmse/img-4.tiff') as tif:
+        image = tif.asarray()  # Convert the TIFF image to a numpy array
+    p = Processor(hsi_data=image)
+    #hsi_data = p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
+    hsi_data_5 = p.hyperCrop2D(p.hsi_data, 224, 236)
+
+    o = Objective()
+
+    print("Init improvement")
+    print(o.SID(hsi_data_5, hsi_data3))
+    print("Final improvement")
+    print(o.SID(hsi_resolved, hsi_data3))
+
+    print("Trying this")
+    print(calculate_rmse(hsi_data_5, hsi_data3))
+    print("and")
+    print(calculate_rmse(hsi_resolved, hsi_data3))
+
+
+    # print("sanity check")
+    # print(SSIM(hsi_data, hsi_resolved))
+    # print(mask.shape)
+    # print(type(mask[6,6]))
+
+    # print(final_image.shape)
+    # print(type(final_image[6,6,0]))
+
+    
+    # blurred_image = cv2.GaussianBlur(final_image, (5, 5), 0)
+    # smoothed_image = cv2.bitwise_and(final_image, final_image, mask=(1 - mask))
+
+    # # Combine the original and smoothed images
+    # result_image = cv2.add(blurred_image, smoothed_image)
+
+    blur_image = blur_where_mask(final_image, mask)
+
+    fig, axes = plt.subplots(1, 5, figsize=(15, 5))
+    axes[0].imshow(shadowP.genFalseRGB(convertPIL=True))
+    axes[1].imshow(init_image)
+    axes[2].imshow(gradient_normalized)
+    axes[3].imshow(blur_image)
+    axes[4].imshow(upsampled_array)
+    
+
+
+    plt.tight_layout()
+    plt.show()
+
+    # # Define a threshold for high gradients
+    # gradient_threshold = 100  # Adjust this threshold as needed
+
+    # # Create a mask where high gradients are present
+    # high_gradient_mask = (gradient_magnitude > gradient_threshold).astype(np.uint8)
+
+    # # Apply Gaussian blur only to areas with high gradients
+    # blurred_image = cv2.GaussianBlur(final_image, (5, 5), 0)
+    # smoothed_image = cv2.bitwise_and(final_image, final_image, mask=(1 - high_gradient_mask))
+
+    # # Combine the original and smoothed images
+    # result_image = cv2.add(blurred_image, smoothed_image)
+
+    # # Display the result
+    # cv2.imshow("Result", result_image)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()

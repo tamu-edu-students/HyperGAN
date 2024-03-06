@@ -46,6 +46,28 @@ def reconstruction_subset(shadow_mask, feature_map):
     
     return rec_from, rec_to
 
+def shadow_patches(shadow_mask, patch_size=4, threshold=128):
+
+    height, width = shadow_mask.shape
+    shadow_indxs = []
+    # Initialize an empty binary image
+    binary_image = np.zeros(( (height//patch_size)-1, (width//patch_size)-1 ), dtype=np.uint8)
+
+    # Iterate over the image in patch_size steps
+    for y in range(0, height-patch_size, patch_size):
+        for x in range(0, width-patch_size, patch_size):
+            
+            patch = shadow_mask[y:y+patch_size, x:x+patch_size]
+            patch_mean = np.mean(patch)
+
+            if patch_mean > threshold/32:
+                binary_image[y // patch_size, x // patch_size] = 1
+                shadow_indxs.append((x, y))
+                print("shadow index", (x // patch_size, y // patch_size))
+    
+    print(binary_image.shape)
+    return binary_image, shadow_indxs
+
 def match_patch(pixel_center, class_subset, hsi, k_means, criteria='EUD'):
 
     print("matching patch")
@@ -128,6 +150,9 @@ def plot_replacement(hsi, loc, candidate):
     plt.show()
 
 
+def refine_boundaries(hsi, shadow_truth, threshold = 100):
+    None
+
 
 p = Processor()
 hsi = p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
@@ -160,35 +185,35 @@ orig = orig.resize((256, 256))
 print(orig.size)
 print(shadow_mask.size)
 
-blended = Image.blend(orig, shadow_mask, 0.5)
+# blended = Image.blend(orig, shadow_mask, 0.5)
 
-# Display the blended image
-blended.show()
+# # Display the blended image
+# blended.show()
 
-# rec_from, rec_to = reconstruction_subset(shadow_mask, feature_map)
+rec_from, rec_to = reconstruction_subset(shadow_mask, feature_map)
 
-# pca_scores = convert_PCA(hsi, 3, False)
-# print(pca_scores)
+pca_scores = convert_PCA(hsi, 3, False)
+print(pca_scores)
 
-# refined = fine_removal(hsi, pca_scores, rec_from, rec_to)
+refined = fine_removal(hsi, pca_scores, rec_from, rec_to)
 
-# p2 = Processor(hsi_data=refined)
+p2 = Processor(hsi_data=refined)
 
-# orig_image = p.genFalseRGB(convertPIL=True)
-# rec_image = p2.genFalseRGB(convertPIL=True)
+orig_image = p.genFalseRGB(convertPIL=True)
+rec_image = p2.genFalseRGB(convertPIL=True)
 
-# rec_image.save(r'datasets/shadow_masks/reconstructed.png')
+rec_image.save(r'datasets/shadow_masks/reconstructed.png')
 
-# orig_image.show()
-# rec_image.show()
-# shadow_mask.show()
+orig_image.show()
+rec_image.show()
+shadow_mask.show()
 
-# # Alternatively, you can display them using matplotlib
-# fig, axes = plt.subplots(1, 3)  # Create a figure with 1 row and 3 columns
-# axes[0].imshow(orig_image)
-# axes[0].axis('off')  # Turn off axis
-# axes[1].imshow(rec_image)
-# axes[1].axis('off')
-# axes[2].imshow(shadow_mask)
-# axes[2].axis('off')
-# plt.show()
+# Alternatively, you can display them using matplotlib
+fig, axes = plt.subplots(1, 3)  # Create a figure with 1 row and 3 columns
+axes[0].imshow(orig_image)
+axes[0].axis('off')  # Turn off axis
+axes[1].imshow(rec_image)
+axes[1].axis('off')
+axes[2].imshow(shadow_mask)
+axes[2].axis('off')
+plt.show()

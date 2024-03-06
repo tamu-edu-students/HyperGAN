@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import cv2
 import cuvis
 import time
+import tifffile
 
 class Processor:
     """
@@ -44,6 +45,7 @@ class Processor:
 
             self.hsi_data = self.genArray()
             self.hsi_data = self.hyperCrop2D(self.hsi_data, 256,256)
+            print(self.hsi_data.shape)
             self.bands, self.rows, self.cols = self.hsi_data.shape
 
         if img_path.find("cu3") != -1:  # open file if in cubert format
@@ -155,6 +157,7 @@ class Processor:
         bands, height, width = (
             self.hsi_data.shape
         )  # capturing dimensions of measurement
+        #self.hsi_data = np.transpose(self.hsi_data, axes=(0, 2, 1))
         arr_list = []
         for i in range(bands):
             arr_list.append(
@@ -234,9 +237,10 @@ class Processor:
 
 #         return arr_list
 
-
-p = Processor()
-p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
+with tifffile.TiffFile('datasets/shadow_masks/resolved.tiff') as tif:
+    image = tif.asarray()  # Convert the TIFF image to a numpy array
+p = Processor(hsi_data=image)
+# p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
 print(p.hsi_data.shape)
 # p.genFalseRGB(visualize=True)
 # cropped_region = p.hsi_data[10:75, 12:24, :]

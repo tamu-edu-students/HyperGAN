@@ -155,6 +155,7 @@ class ViTExtractor:
         pil_image = Image.open(image_path).convert('RGB')
         if load_size is not None:
             pil_image = transforms.Resize(load_size, interpolation=transforms.InterpolationMode.LANCZOS)(pil_image)
+            print("size is " , pil_image.size)
         prep = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=self.mean, std=self.std)
