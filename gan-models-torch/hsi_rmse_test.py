@@ -13,7 +13,10 @@ from hyperspectral.util.eval_metrics import calculate_rmse, SSIM
 from hyperspectral import processor
 import warnings
 import rasterio
+<<<<<<< HEAD
 import tifffile
+=======
+>>>>>>> 2f4463fff66c40eb98ff6fa17c80c0caee775ac4
 
 if __name__ == '__main__':
     warnings.filterwarnings("ignore", message="Using a target size .* that is different to the input size .*")
@@ -38,7 +41,10 @@ if __name__ == '__main__':
     py.mkdir(model.sample_dir)
     iters = 0
     rec_ssim = []
+<<<<<<< HEAD
     res_hyper = []
+=======
+>>>>>>> 2f4463fff66c40eb98ff6fa17c80c0caee775ac4
 
     for i, batch in tqdm.tqdm(enumerate(dataloader), desc='Test Loop', total=len(dataloader.dataset)):
         
@@ -47,14 +53,20 @@ if __name__ == '__main__':
         model.forward()
         pil_real_A, pil_fake_B, spec_real_A, spec_fake_B = model.get_visuals(iters)
 
+<<<<<<< HEAD
         model.save_mask()
 
+=======
+>>>>>>> 2f4463fff66c40eb98ff6fa17c80c0caee775ac4
         p = processor.Processor()
         p.prepare_data(r'datasets/hsi_rmse/ref/session_000_001k_044_snapshot_cube.tiff')
         real_B = p.genFalseRGB(convertPIL=True)
         rec_ssim.append([SSIM(spec_real_A, p.hsi_data), SSIM(spec_fake_B, p.hsi_data)])
+<<<<<<< HEAD
         tifffile.imsave(py.join(model.output_dir, "img-{}.tiff".format(i)), spec_fake_B)
 
+=======
+>>>>>>> 2f4463fff66c40eb98ff6fa17c80c0caee775ac4
     
     for i, val in enumerate(rec_ssim):
         print("Reconstruction for Image: ", i+1)

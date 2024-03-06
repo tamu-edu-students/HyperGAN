@@ -10,7 +10,10 @@ from torch.utils.data import DataLoader
 from PIL import Image
 import tqdm
 from dataset.maskshadow_dataset import MaskImageDataset
+<<<<<<< HEAD
 from dataset.hyperspectral_dataset import HyperspectralImageDataset
+=======
+>>>>>>> 2f4463fff66c40eb98ff6fa17c80c0caee775ac4
 import queue
 import torchvision.transforms as transforms
 from io import BytesIO
@@ -25,6 +28,7 @@ if __name__ == "__main__":
     warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
     opt = TestOptions().parse()
 
+<<<<<<< HEAD
     # transforms_ = [
     #     transforms.Resize((opt.crop_size, opt.crop_size), Image.BICUBIC),
     #     # transforms.Resize(int(opt.crop_size * 1.12), Image.Resampling.BICUBIC),
@@ -54,6 +58,27 @@ if __name__ == "__main__":
     ]
     dataloader = DataLoader(HyperspectralImageDataset(opt.datasets_dir, opt.dataroot, True, transforms_=transforms_, unaligned=True, mode='test'),
                 batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu)
+=======
+    transforms_ = [
+        transforms.Resize((opt.crop_size, opt.crop_size), Image.BICUBIC),
+        # transforms.Resize(int(opt.crop_size * 1.12), Image.Resampling.BICUBIC),
+        # transforms.RandomCrop(opt.crop_size),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    ]
+    dataloader = DataLoader(
+        MaskImageDataset(
+            opt.datasets_dir,
+            opt.dataroot,
+            transforms_=transforms_,
+            unaligned=True,
+            mode="test",
+        ),
+        batch_size=opt.batch_size,
+        shuffle=opt.shuffle,
+        num_workers=opt.n_cpu,
+    )
+>>>>>>> 2f4463fff66c40eb98ff6fa17c80c0caee775ac4
 
     model = create_model(opt)
     model.data_length = len(dataloader.dataset)

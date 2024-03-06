@@ -45,7 +45,13 @@ class TrainOptions(BaseOptions):
             action="store_true",
             help="option to export trained model to ONNX format",
         )
+<<<<<<< HEAD
         
+=======
+        parser.add_argument(
+            "--transfer", action="store_true", help="build upon pre-trained model"
+        )
+>>>>>>> 2f4463fff66c40eb98ff6fa17c80c0caee775ac4
         parser.add_argument(
             "--unfreeze_layers_iters",
             type=int,
