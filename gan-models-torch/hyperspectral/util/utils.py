@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
 from sklearn.metrics import mean_squared_error
 from skimage.filters import threshold_otsu
+from .eval_metrics import calculate_rmse, SSIM
+from ..processor import Processor
 
 
 def spectral_plot(
@@ -51,3 +53,41 @@ def highlight_selector(shadowed, deshadowed):
 
 def hyper_to_gray():
     pass
+
+def hyper_measures_eval(gt_hsi, resolved_hsi, rec_indxs):
+    
+    gt_spectra = []
+    resolved_spectra = []
+
+    p = Processor(hsi_data=gt_hsi)
+    p2 = Processor(hsi_data=resolved_hsi)
+    im1 = p.genFalseRGB(convertPIL=True)
+    im2 = p2.genFalseRGB(convertPIL=True)
+    
+    box_size=4
+
+    assert gt_hsi.shape == resolved_hsi.shape, "images are not the same size" 
+
+    for x,y in rec_indxs:
+
+        gt_spectra.append(gt_hsi[x, y, :])
+        resolved_spectra.append(resolved_hsi[x, y, :])
+
+    gt_avg_spectra = np.mean(gt_spectra, axis=0)
+    resolved_avg_spectra = np.mean(resolved_spectra, axis=0)
+
+    x = np.arange(51)
+    plt.plot(x, gt_avg_spectra, label='gt')
+    plt.plot(x, resolved_avg_spectra, label='resolved')
+    plt.xlabel('Index')
+    plt.ylabel('Value')
+    plt.title('Plot of Two Arrays')
+    plt.ylim(0,270)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    rmse = calculate_rmse(gt_avg_spectra, resolved_avg_spectra)
+    ssim = SSIM(gt_avg_spectra, resolved_avg_spectra)
+
+    return rmse, ssim

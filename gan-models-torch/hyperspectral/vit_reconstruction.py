@@ -1,6 +1,6 @@
 import argparse
 import torch
-from extractor import ViTExtractor
+from .extractor import ViTExtractor
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -8,12 +8,12 @@ import time
 import cv2
 import math
 from PIL import Image
-from classification import Classify
-from processor import Processor
+from .classification import Classify, Objective
+from .processor import Processor
 from scipy.ndimage import zoom
 import tifffile
-from util.eval_metrics import calculate_rmse, SSIM
-from classification import Objective
+from .util.eval_metrics import calculate_rmse, SSIM
+from .util.utils import hyper_measures_eval
 
 def chunk_cosine_sim(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     """ Computes cosine similarity between all possible pairs in two sets of vectors.
@@ -31,7 +31,7 @@ def chunk_cosine_sim(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     return torch.stack(result_list, dim=2)  # Bx1x(t_x)x(t_y)
 
 
-def shadow_sim_iter(image_path: str, hsi_data, reconstruction_set, shadow_map, load_size: int = 224, layer: int = 11,
+def shadow_sim_iter(rgb_image, hsi_data, reconstruction_set, shadow_map, load_size: int = 224, layer: int = 11,
                                 facet: str = 'key', bin: bool = False, stride: int = 4, model_type: str = 'dino_vits8'):
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -39,9 +39,9 @@ def shadow_sim_iter(image_path: str, hsi_data, reconstruction_set, shadow_map, l
     extractor.model = extractor.patch_vit_resolution(extractor.model, 4)
     patch_size = extractor.model.patch_embed.patch_size
 
-    image_batch_a, image_pil_a = extractor.preprocess(image_path, load_size)
+    image_batch_a, image_pil_a = extractor.preprocess(rgb_image, load_size)
     print(image_batch_a.shape)
-    image_batch_b, image_pil_b = extractor.preprocess(image_path, load_size)
+    image_batch_b, image_pil_b = extractor.preprocess(rgb_image, load_size)
     descs_a = extractor.extract_descriptors(image_batch_a.to(device), layer, facet, bin, include_cls=True)
     descs_b = extractor.extract_descriptors(image_batch_b.to(device), layer, facet, bin, include_cls=True)
     similarities = chunk_cosine_sim(descs_a, descs_b)
@@ -49,7 +49,7 @@ def shadow_sim_iter(image_path: str, hsi_data, reconstruction_set, shadow_map, l
     hsi_refined = hsi_data
 
     for i, j in reconstruction_set:
-        best_candidate_loc, center_orig = similarity_finder(i,j,similarities, shadow_map, hsi_data, extractor, num_sim_patches=7)
+        best_candidate_loc, center_orig = similarity_finder(i,j,similarities, shadow_map, hsi_data, extractor, num_sim_patches=30)
         hsi_refined = replace_spectra(hsi_refined, center_orig, best_candidate_loc)
         
     return hsi_refined
@@ -87,7 +87,7 @@ def similarity_finder(x_coor, y_coor, similarities, shadow_map, hsi_data, extrac
     shadow_map = torch.tensor(shadow_map).to(device)
     #Subtract shadow map binary values, after converting to torch tensor so that similat
     sims, idxs = torch.topk(curr_similarities.flatten()-10*shadow_map.flatten(), num_sim_patches)
-    #print("similarities length", sims.shape, "and they are", sims)
+    print("similarities length", sims.shape, "and they are", sims)
     # print("index length", idxs.shape, "and they are", idxs)
     # mask_filtered_indices = idxs[shadow_map.flatten() == 0]
     # top_5_matches = mask_filtered_indices[:num_sim_patches]
@@ -239,22 +239,75 @@ def blur_where_mask(image, mask):
     return blurred_image
 
 
+def fine_removal(shadow_mask, orig_image, gan_output):
+
+    """
+    shadow_mask (PIL Image) - shadow mask of the image
+    orig_image (numpy array) - unresolved hsi image before gan
+    gan_output (numpy array) - coarsely refined hsi image
+    
+    """
+
+    #shadow patch processing
+    shadow_mask = shadow_mask.convert('L')
+    shadow_mask = np.array(shadow_mask.resize((236,224), Image.BICUBIC))
+    patch_mask, rec_indxs = shadow_patches(shadow_mask)
+
+    # Upsample the array using bicubic interpolation, for display and matching
+    upsampled_array = np.uint8(zoom(patch_mask, (224 / patch_mask.shape[0], 236 / patch_mask.shape[1]), order=3))
+
+    #formatting orig data
+    origP = Processor(hsi_data=orig_image)
+    shadow_im = origP.hyperCrop2D(origP.hsi_data, 224, 236)
+
+    #formatting gan data
+    ganP = Processor(hsi_data=gan_output)
+    hsi_data = ganP.hyperCrop2D(ganP.hsi_data, 224, 236)
+    init_image = ganP.genFalseRGB(convertPIL=True)
+    init_image = init_image.resize((290, 275))
+
+    #fine removal
+    start_time = time.time()
+    hsi_resolved = None
+    with torch.no_grad():
+        hsi_resolved = shadow_sim_iter(init_image, hsi_data, rec_indxs, patch_mask)
+
+    end_time = time.time()
+    print(f"Elapsed time: {end_time - start_time} seconds")
+
+    fineP = Processor(hsi_resolved)
+    final_image = fineP.genFalseRGB(convertPIL=True)
+
+    #plot results
+    fig, axes = plt.subplots(1, 4, figsize=(15, 5))
+    axes[0].imshow(origP.genFalseRGB(convertPIL=True))
+    axes[1].imshow(init_image)
+    axes[2].imshow(fineP.genFalseRGB(convertPIL=True))
+    axes[3].imshow(upsampled_array)
+
+    plt.tight_layout()
+    #plt.show()
+
+    return hsi_resolved
+
+
 if __name__ == '__main__':
     
-    shadow_mask = Image.open(r'datasets/shadow_masks/13_mask.png').convert('L')
+    shadow_mask = Image.open(r'datasets/ctf_pipeline/mask/20.png').convert('L')
     shadow_mask = shadow_mask.resize((236,224), Image.BICUBIC)
     # plt.imshow(shadow_mask, cmap='gray')
     # plt.show()
     shadow_mask = np.array(shadow_mask)
     patch_mask, rec_indxs = shadow_patches(shadow_mask)
 
-    with tifffile.TiffFile(r'datasets/export_2/trainA/session_000_001k_027_snapshot_ref.tiff') as tif:
+    with tifffile.TiffFile(r'datasets/ctf_pipeline/testA/20.tiff') as tif:
         shadow_image = tif.asarray()
 
-    shadowP = Processor(hsi_data=shadow_image)
+    shadowP = Processor()
+    shadowP.prepare_data(r'datasets/ctf_pipeline/testA/20.tiff')
     shadow_im = shadowP.hyperCrop2D(shadowP.hsi_data, 224, 236)
 
-    with tifffile.TiffFile('output/hsi_rmse/img-4.tiff') as tif:
+    with tifffile.TiffFile('datasets/ctf_pipeline/coarse/20.tiff') as tif:
         image = tif.asarray()  # Convert the TIFF image to a numpy array
     p = Processor(hsi_data=image)
     #hsi_data = p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
@@ -264,15 +317,15 @@ if __name__ == '__main__':
     # plt.imshow(patch_mask, cmap='gray', interpolation='nearest')
     # plt.axis('off')  # Turn off axis
     # plt.show()
-    rgb_image_path = r'datasets/shadow_masks/13_gan.png'
-    img = Image.open(rgb_image_path)
+    rgb_image_path = r'datasets/shadow_masks/48_gan.png'
+    img = init_image #Image.open(rgb_image_path)
     resized_img = img.resize((290, 275))  # Specify the new dimensions\
     resized_img.save(rgb_image_path)
 
     start_time = time.time()
     hsi_resolved = None
     with torch.no_grad():
-        hsi_resolved = shadow_sim_iter(rgb_image_path, hsi_data, rec_indxs, patch_mask)
+        hsi_resolved = shadow_sim_iter(resized_img, hsi_data, rec_indxs, patch_mask)
 
     end_time = time.time()
     elapsed_time = end_time - start_time
@@ -282,7 +335,7 @@ if __name__ == '__main__':
     p2 = Processor(hsi_resolved)
     final_image = p2.genFalseRGB(convertPIL=True)
 
-    tifffile.imsave(r'datasets/shadow_masks/resolved_2.tiff', hsi_resolved)
+    tifffile.imsave(r'datasets/shadow_masks/resolved.tiff', hsi_resolved)
 
     final_image = np.array(final_image)
     
@@ -325,14 +378,14 @@ if __name__ == '__main__':
     mask = ((sobel_gradient_combined*upsampled_array)>50).astype(np.uint8)
 
     p3 = Processor()
-    p3.prepare_data(r'datasets/hsi_rmse/ref/session_000_001k_044_snapshot_cube.tiff')
+    p3.prepare_data(r'datasets/ctf_pipeline/ref/20.tiff')
     hsi_data3 = p3.hyperCrop2D(p3.hsi_data, 224, 236)
 
     
 
 
 
-    with tifffile.TiffFile('output/hsi_rmse/img-4.tiff') as tif:
+    with tifffile.TiffFile('datasets/ctf_pipeline/coarse/20.tiff') as tif:
         image = tif.asarray()  # Convert the TIFF image to a numpy array
     p = Processor(hsi_data=image)
     #hsi_data = p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
@@ -350,7 +403,15 @@ if __name__ == '__main__':
     print("and")
     print(calculate_rmse(hsi_resolved, hsi_data3))
 
+    
+    rmse, ssim = hyper_measures_eval(hsi_data3, shadow_im, rec_indxs)
+    print("mask specific results", rmse, " and ", ssim)
 
+    rmse, ssim = hyper_measures_eval(hsi_data3, hsi_data_5, rec_indxs)
+    print("mask coarse specific results", rmse, " and ", ssim)
+
+    rmse, ssim = hyper_measures_eval(hsi_data3, hsi_resolved, rec_indxs)
+    print("mask fine specific results", rmse, " and ", ssim)
     # print("sanity check")
     # print(SSIM(hsi_data, hsi_resolved))
     # print(mask.shape)

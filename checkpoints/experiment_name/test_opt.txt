@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 ----------------- Options ---------------
     adversarial_loss_mode: lsgan                         
                batch_size: 1                             
@@ -8,7 +7,7 @@
                 crop_size: 256                           
                      cuda: False                         
         cycle_loss_weight: 10.0                          
-                 dataroot: hsi_rmse                      	[default: None]
+                 dataroot: ctf_pipeline                  	[default: None]
              datasets_dir: datasets                      
               epoch_count: 170                           	[default: 1]
               epoch_decay: 300                           
@@ -34,40 +33,3 @@
                    suffix:                               
                  transfer: False                         
 ----------------- End -------------------
-=======
------------------ Options ---------------
-    adversarial_loss_mode: lsgan                         
-               batch_size: 1                             
-                   beta_1: 0.5                           
-      checkpoint_interval: 10                            
-          checkpoints_dir: checkpoints                   
-                crop_size: 256                           
-                     cuda: False                         
-        cycle_loss_weight: 10.0                          
-                 dataroot: hsi_real_time                 	[default: None]
-             datasets_dir: datasets                      
-              epoch_count: 410                           	[default: 1]
-              epoch_decay: 100                           
-                   epochs: 1000                          
-           expand_dataset: False                         
-                  gpu_ids: 0                             
-    gradient_penalty_mode: none                          
-  gradient_penalty_weight: 10.0                          
-     identity_loss_weight: 0.0                           
-                 input_nc: 3                             
-                  isTrain: False                         	[default: None]
-                load_size: 256                           
-                       lr: 0.0002                        
-                    model: maskshadow_gan                	[default: cycle_gan]
-                    n_cpu: 8                             
-                     name: experiment_name               
-               no_dropout: True                          
-                output_nc: 3                             
-                    phase: test                          
-                pool_size: 50                            
-                  restore: False                         
-              results_dir: samples_testing               
-                  shuffle: False                         
-                   suffix:                               
------------------ End -------------------
->>>>>>> 2f4463fff66c40eb98ff6fa17c80c0caee775ac4

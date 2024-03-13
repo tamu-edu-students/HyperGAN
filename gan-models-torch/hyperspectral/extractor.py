@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Union, List, Tuple
 from PIL import Image
 import sys
-from processor import Processor
+from .processor import Processor
 
 
 class ViTExtractor:
@@ -142,7 +142,7 @@ class ViTExtractor:
         print("patchwwd, ", patch_size)
         return model
 
-    def preprocess(self, image_path: Union[str, Path],
+    def preprocess(self, rgb_image,
                    load_size: Union[int, Tuple[int, int]] = None) -> Tuple[torch.Tensor, Image.Image]:
         """
         Preprocesses an image before extraction.
@@ -152,7 +152,7 @@ class ViTExtractor:
                     (1) the preprocessed image as a tensor to insert the model of shape BxCxHxW.
                     (2) the pil image in relevant dimensions
         """
-        pil_image = Image.open(image_path).convert('RGB')
+        pil_image = rgb_image.convert('RGB')
         if load_size is not None:
             pil_image = transforms.Resize(load_size, interpolation=transforms.InterpolationMode.LANCZOS)(pil_image)
             print("size is " , pil_image.size)

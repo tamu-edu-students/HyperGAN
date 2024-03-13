@@ -38,7 +38,9 @@ class HyperspectralImageDataset(BaseImageDataset):
         """used for capturing item A and item B from both domains"""
         item_A = self.files_A[
             index % len(self.files_A)
-        ]  # indexing to location in file directory
+        ]  
+        print(index)
+        # indexing to location in file directory
         proc = processor.Processor()
         item_A = self.transform(
             proc.prepare_data(item_A)

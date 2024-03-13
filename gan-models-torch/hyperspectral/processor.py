@@ -11,10 +11,7 @@ import matplotlib.pyplot as plt
 import cv2
 import cuvis
 import time
-<<<<<<< HEAD
 import tifffile
-=======
->>>>>>> 2f4463fff66c40eb98ff6fa17c80c0caee775ac4
 
 class Processor:
     """
@@ -47,13 +44,8 @@ class Processor:
                 self.hsi_data = src.read()
 
             self.hsi_data = self.genArray()
-<<<<<<< HEAD
             self.hsi_data = self.hyperCrop2D(self.hsi_data, 256,256)
-            print(self.hsi_data.shape)
-=======
-            print(self.hsi_data.shape)
-            self.hsi_data = self.hyperCrop(self.hsi_data, 256)
->>>>>>> 2f4463fff66c40eb98ff6fa17c80c0caee775ac4
+            #print(self.hsi_data.shape)
             self.bands, self.rows, self.cols = self.hsi_data.shape
 
         if img_path.find("cu3") != -1:  # open file if in cubert format
@@ -67,13 +59,6 @@ class Processor:
 
         if img_path.find("hdr") != -1:
 
-<<<<<<< HEAD
-=======
-            # shape = (3, 290, 275)
-            # self.hsi_data = np.random.rand(*shape)
-            # Generate random noise in the range [0, 1]
-
->>>>>>> 2f4463fff66c40eb98ff6fa17c80c0caee775ac4
             img_path_data = img_path[:-4]
             img = envi.open(
                 img_path, img_path_data
@@ -91,21 +76,12 @@ class Processor:
             self.bands, self.rows, self.cols = self.hsi_data.shape
 
         return self.hsi_data  # returns data
-<<<<<<< HEAD
     
     def hyperCrop2D(self, arr, target_dimX, target_dimY):
 
         target_shape = (target_dimX, target_dimY)  # input crop sizes
         rec_array = np.empty(
             (target_dimX, target_dimY, arr.shape[2]), dtype=np.float32
-=======
-
-    def hyperCrop(self, arr, target_dim):
-
-        target_shape = (target_dim, target_dim)  # input crop sizes
-        rec_array = np.empty(
-            (target_dim, target_dim, arr.shape[2]), dtype=np.float32
->>>>>>> 2f4463fff66c40eb98ff6fa17c80c0caee775ac4
         )  # empty 3D array
         arr_list = []
 
@@ -181,10 +157,7 @@ class Processor:
         bands, height, width = (
             self.hsi_data.shape
         )  # capturing dimensions of measurement
-<<<<<<< HEAD
         #self.hsi_data = np.transpose(self.hsi_data, axes=(0, 2, 1))
-=======
->>>>>>> 2f4463fff66c40eb98ff6fa17c80c0caee775ac4
         arr_list = []
         for i in range(bands):
             arr_list.append(
@@ -264,19 +237,12 @@ class Processor:
 
 #         return arr_list
 
-<<<<<<< HEAD
 with tifffile.TiffFile('datasets/shadow_masks/resolved.tiff') as tif:
     image = tif.asarray()  # Convert the TIFF image to a numpy array
 p = Processor(hsi_data=image)
 # p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
-print(p.hsi_data.shape)
+#print(p.hsi_data.shape)
 # p.genFalseRGB(visualize=True)
-=======
-
-p = Processor()
-p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
-p.genFalseRGB(visualize=True)
->>>>>>> 2f4463fff66c40eb98ff6fa17c80c0caee775ac4
 # cropped_region = p.hsi_data[10:75, 12:24, :]
 # print(cropped_region.shape)
 # average_hyper = np.mean(cropped_region, axis=(0, 1))
