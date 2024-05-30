@@ -222,7 +222,6 @@ class MaskShadowHsiGANModel(BaseModel):
         """
         self.real_A = torch.autograd.Variable(self.input_A.copy_(batch["A"]))
         self.real_B = torch.autograd.Variable(self.input_B.copy_(batch["B"]))
-        print(self.real_A.shape)
         return None
 
     def forward(self):
@@ -387,6 +386,14 @@ class MaskShadowHsiGANModel(BaseModel):
                 mod_to_spectral(self.real_A),
                 mod_to_spectral(self.fake_B),
             )
+
+    def save_mask(self):
+
+        binMask = mod_to_pil(self.rand_guide_mask, False)
+        binMask = binMask.convert('L')
+        img = binMask.point(lambda p: p > 128 and 255)
+        img.save(py.join(self.sample_dir, "img-mask.jpg"))
+        return img
 
     def expand_dataset(self):
 

@@ -3,6 +3,7 @@
 import os
 import glob
 import cuvis
+from cuvis.cuvis_types import ProcessingMode
 import matplotlib.pyplot as plt
 import numpy as np
 import time
@@ -211,15 +212,15 @@ def prettyprint_attributes(mesu: cuvis.Measurement) -> None:
 
 def exporter(file_type, domain):
 
-    userSettingsDir = "./datasets/real_time/ultris5/"
-    measurementLoc = "./datasets/real_time/test{}/".format(domain)
+    userSettingsDir = "./datasets/hsi/ultris5/"
+    measurementLoc = "./datasets/eval_export/test{}/".format(domain)
     darkLoc = (
-        "./datasets/hsi/Calibration/dark__session_000_015_snapshot16976577013877078.cu3"
+        "./datasets/eval_export/Calibration/dark__session_000_004_snapshot17098596920562928.cu3"
     )
-    whiteLoc = "./datasets/hsi/Calibration/white__session_000_017_snapshot16976577395328359.cu3"
-    distanceLoc = "./datasets/hsi/Calibration/distanceCalib__session_000_010_snapshot16976559049021536.cu3"
-    factoryDir = "./datasets/real_time/ultris5/"
-    outDir = "./datasets/hsi_real_time_2/test{}/".format(domain)
+    whiteLoc = "./datasets/eval_export/Calibration/white__session_000_012_snapshot17098601870622098.cu3"
+    distanceLoc = "./datasets/eval_export/Calibration/distanceCalib__session_000_006_snapshot17098598097816240.cu3"
+    factoryDir = "./datasets/hsi/ultris5/"
+    outDir = "./datasets/eval/test{}/".format(domain)
     os.makedirs(outDir, exist_ok=True)
 
     cu3_files = glob.glob(os.path.join(measurementLoc, "*.cu3"))
@@ -229,7 +230,8 @@ def exporter(file_type, domain):
         mesu = cuvis.Measurement(cu3_file)
         prettyprint_attributes(mesu)
         if file_type == "tiff":
-            if mesu.ProcessingMode != "Reflectance":
+            print(type(mesu.processing_mode), "yea")
+            if mesu.processing_mode != ProcessingMode.Reflectance:
                 break
                 reprocessMeasurement(
                     userSettingsDir,
@@ -244,7 +246,7 @@ def exporter(file_type, domain):
                 )
             else:
                 tiff_settings = cuvis.TiffExportSettings(
-                    ExportDir=os.path.join(outDir, "train{}".format(domain))
+                    export_dir=os.path.join(outDir, "train{}".format(domain))
                 )
                 tiffExporter = cuvis.TiffExporter(tiff_settings)
                 print("saving ", cu3_file)
@@ -326,5 +328,5 @@ def rgb_to_hyper(domain, fit=None, cube_rep=17):
 
 if __name__ == "__main__":
 
-    # exporter("png", "A")
-    rgb_to_hyper("B", 'cubic')
+    exporter("tiff", "B")
+    # rgb_to_hyper("B", 'cubic')

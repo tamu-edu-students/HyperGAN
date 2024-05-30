@@ -145,6 +145,14 @@ RUN python3.9 -m pip install -U Pillow  && \
     python3.9 -m pip install torchsummary &&\
     python3.9 -m pip install black
 
+<<<<<<< HEAD
+RUN python3.9 -m pip install pysptools &&\
+    python3.9 -m pip install ipython &&\
+    python3.9 -m pip install pandas &&\
+    python3.9 -m pip install timm
+
+=======
+>>>>>>> 2f4463fff66c40eb98ff6fa17c80c0caee775ac4
 # below is a temp fix until the cuvis.cpp repo is updated
 RUN cd /cuvis.sdk/ &&\
     rm -r cuvis.cpp &&\

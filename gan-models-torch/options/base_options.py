@@ -116,6 +116,9 @@ class BaseOptions:
             default=1,
             help="the starting epoch count, we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>, ...",
         )
+        parser.add_argument(
+            "--transfer", action="store_true", help="build upon pre-trained model"
+        )
 
         self.initialized = True
         return parser

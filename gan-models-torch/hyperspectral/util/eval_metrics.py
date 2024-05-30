@@ -62,3 +62,4 @@ def normalize(data):
     array_max = data.max()
 
     return (data - array_min) / (array_max - array_min)
+ 
