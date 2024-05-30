@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Union, List, Tuple
 from PIL import Image
 import sys
-from .processor import Processor
+from processor import Processor
 
 
 class ViTExtractor:

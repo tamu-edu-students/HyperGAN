@@ -9,8 +9,7 @@ class Objective:
     
     def __init__(self):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.use_gpu = False 
-        #True if torch.cuda.is_available() else False
+        self.use_gpu = True if torch.cuda.is_available() else False
     
     def SAM(self, ref, input):
 
@@ -147,13 +146,16 @@ class Classify:
         outputs:
             index of min element
         """
-        scores = {}
+        scores = []
+        indices = []
         
         for label, val in ref_list.items():
             args = (val, input, True) if self.evaluation == 'SCM' else (val, input) 
-            scores[label] = self.evaluator(*args) 
+            scores.append(self.evaluator(*args)) 
+            indices.append(label)
         
-        return min(scores, key=lambda k: scores[k])
+        min_index = scores.index(min(scores))
+        return min_index
     
     def compute_divergence_measure(self, target, ref):
         return self.evaluator(target, ref)

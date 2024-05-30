@@ -1,12 +1,15 @@
 import torchvision.transforms as transforms
 import numpy as np
 import io
+import os
+import csv
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
 from sklearn.metrics import mean_squared_error
 from skimage.filters import threshold_otsu
-from .eval_metrics import calculate_rmse, SSIM
-from ..processor import Processor
+from eval_metrics import calculate_rmse, SSIM
+#from ..processor import Processor
+import csv
 
 
 def spectral_plot(
@@ -91,3 +94,44 @@ def hyper_measures_eval(gt_hsi, resolved_hsi, rec_indxs):
     ssim = SSIM(gt_avg_spectra, resolved_avg_spectra)
 
     return rmse, ssim
+
+def spectra_eval(csv_file):
+    
+    data_dict = {}
+    results_dict = {}
+
+    with open(csv_file, newline='') as csvfile:
+        reader = csv.reader(csvfile)
+        headers = next(reader)
+
+        for header in headers:
+            data_dict[header] = []
+
+        for row in reader:
+            for i, value in enumerate(row):
+                data_dict[headers[i]].append(value)
+
+        for header in headers:
+            if 'gt' in header:
+                gt_values = np.array([float(value)/255 for value in data_dict[header]])
+                for other_header in headers:
+                    if other_header != header:
+                        other_values = np.array([float(value)/255 for value in data_dict[other_header]])        
+                        results_dict[header + ' to ' + other_header] = [calculate_rmse(gt_values, other_values), SSIM(gt_values, other_values)]
+                        
+    return results_dict
+
+# Example usage:
+
+if __name__ == '__main__':
+
+    directory = r'output/ctf_pipeline/endmembers'
+
+    for filename in os.listdir(directory):
+        if filename.endswith('.csv'):
+            
+            filepath = os.path.join(directory, filename)
+            data_dict = spectra_eval(filepath)
+            
+            print(data_dict)
+

@@ -73,6 +73,7 @@ class EndmemberAnalyzer:
                 print(data.shape)
                 self.p = Processor(hsi_data=data)
                 self.p.hsi_data = self.p.genArray()
+                self.p.hsi_data = self.p.hyperCrop2D(self.p.hsi_data, 256,256)
                 self.img = self.p.genFalseRGB(convertPIL=True)
                 print(self.p.hsi_data.shape)
             else:

@@ -4,7 +4,7 @@ import os
 import csv
 import math
 from classification import Classify
-from segmentation import segment_image
+from segmentation import segment_image, segmentation_patches
 from pca import convert_PCA
 from processor import Processor
 import matplotlib.pyplot as plt
@@ -154,6 +154,8 @@ def refine_boundaries(hsi, shadow_truth, threshold = 100):
     None
 
 
+
+
 p = Processor()
 hsi = p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
 #p.genFalseRGB(visualize=True)
@@ -174,6 +176,7 @@ with open(r'datasets/export_2/endmembers/endmembers.csv', 'r') as csvfile:
             endmember_data[col].append(value)
 
 feature_map = segment_image(hsi, endmember_data)
+segmentation_patches(feature_map)
 
 shadow_mask = Image.open(r'datasets/shadow_masks/48_mask.png')
 shadow_mask = shadow_mask.resize((256,256), Image.BICUBIC)#.convert('L')

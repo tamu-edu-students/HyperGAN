@@ -38,7 +38,7 @@ if __name__ == '__main__':
     ref_dir = py.join(opt.datasets_dir, opt.dataroot, 'ref/*.*')
     mask_dir = py.join(opt.datasets_dir, opt.dataroot, 'mask/')
     coarse_dir = py.join(model.output_dir, 'coarse/')
-    fine_dir = py.join(model.output_dir, 'fine/')
+    fine_dir = py.join(model.output_dir, 'fine_only/')
 
     py.mkdir(model.output_dir)
     py.mkdir(model.sample_dir)
@@ -59,16 +59,16 @@ if __name__ == '__main__':
         # model.save_mask()
 
         alternate_mask = Image.open(py.join(mask_dir, '{}.png'.format(i+1)))
-        fine_result = fine_removal(alternate_mask, spec_real_A, spec_fake_B)
+        fine_result = fine_removal(alternate_mask, spec_real_A, spec_real_A)
 
         p = processor.Processor(hsi_data=fine_result)
   
-        pil_fake_B.save(py.join(coarse_dir, "img-{}.png".format(i)))
+        ##pil_fake_B.save(py.join(coarse_dir, "img-{}.png".format(i)))
         p.genFalseRGB(convertPIL=True).save(py.join(fine_dir, "img-{}.png".format(i)))
         #p.prepare_data(r'datasets/hsi_rmse/ref/session_000_001k_044_snapshot_cube.tiff')
         #real_B = p.genFalseRGB(convertPIL=True)
         # rec_ssim.append([SSIM(spec_real_A, p.hsi_data), SSIM(spec_fake_B, p.hsi_data)])
-        tifffile.imwrite(py.join(coarse_dir, "img-{}.tiff".format(i)), spec_fake_B)
+        ##tifffile.imwrite(py.join(coarse_dir, "img-{}.tiff".format(i)), spec_fake_B)
         tifffile.imwrite(py.join(fine_dir, "img-{}.tiff".format(i)), fine_result)
 
 

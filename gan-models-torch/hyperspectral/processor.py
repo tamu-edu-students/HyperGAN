@@ -237,12 +237,12 @@ class Processor:
 
 #         return arr_list
 
-with tifffile.TiffFile('datasets/shadow_masks/resolved.tiff') as tif:
+with tifffile.TiffFile('datasets/shadow_masks/resolved_48_dino.tiff') as tif:
     image = tif.asarray()  # Convert the TIFF image to a numpy array
 p = Processor(hsi_data=image)
-# p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
-#print(p.hsi_data.shape)
-# p.genFalseRGB(visualize=True)
+# # p.prepare_data(r'datasets/export_2/trainA/session_000_001k_048_snapshot_ref.tiff')
+# #print(p.hsi_data.shape)
+p.genFalseRGB(visualize=True)
 # cropped_region = p.hsi_data[10:75, 12:24, :]
 # print(cropped_region.shape)
 # average_hyper = np.mean(cropped_region, axis=(0, 1))
